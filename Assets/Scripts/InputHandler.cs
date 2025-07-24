@@ -1,10 +1,11 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace DS
 {
-    public class InputController : MonoBehaviour
+    public class InputHandler : MonoBehaviour
     {
         public float horizontal;
         public float vertical;
@@ -34,14 +35,19 @@ namespace DS
             inputActions.Disable();
         }
 
-        public void TickInput()
+        public void TickInput(float delta)
         {
-
+            MoveInput(delta);
         }
 
-        public void MoveInput()
+        public void MoveInput(float delta)
         {
-
+            horizontal = movementInput.x;
+            vertical = movementInput.y;
+            // mouseAmount ¹¦ÄÜÎ´Öª
+            mouseAmount = Mathf.Clamp01(Mathf.Abs(horizontal) + Mathf.Abs(vertical));
+            mouseX = cameraInput.x;
+            mouseY = cameraInput.y;
         }
     }
 
