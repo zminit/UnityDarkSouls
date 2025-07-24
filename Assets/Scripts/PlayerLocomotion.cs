@@ -52,6 +52,8 @@ namespace DS
             Vector3 projectedVelocity = Vector3.ProjectOnPlane(moveDirection, normalVector);
             rigidbody.velocity = projectedVelocity;
 
+            animatorHandler.UpdateAnimator(inputHandler.moveAmount, 0);
+
             if(animatorHandler.canRotate)
             {
                 HandleRotation(delta);
@@ -65,7 +67,7 @@ namespace DS
         private void HandleRotation(float delta)
         {
             Vector3 targetDir = Vector3.zero;
-            float moveOverride = inputHandler.mouseAmount;
+            float moveOverride = inputHandler.moveAmount;
 
             targetDir = cameraObject.forward * inputHandler.vertical;
             targetDir += cameraObject.right * inputHandler.horizontal;

@@ -9,7 +9,7 @@ namespace DS
     {
         public float horizontal;
         public float vertical;
-        public float mouseAmount;
+        public float moveAmount;
         public float mouseX;
         public float mouseY;
 
@@ -45,7 +45,7 @@ namespace DS
             horizontal = movementInput.x;
             vertical = movementInput.y;
             // mouseAmount ¹¦ÄÜÎ´Öª
-            mouseAmount = Mathf.Clamp01(Mathf.Abs(horizontal) + Mathf.Abs(vertical));
+            moveAmount = Mathf.Clamp01(Mathf.Abs(horizontal) + Mathf.Abs(vertical));
             mouseX = cameraInput.x;
             mouseY = cameraInput.y;
         }
