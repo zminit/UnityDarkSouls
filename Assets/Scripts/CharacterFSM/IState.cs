@@ -25,8 +25,9 @@ namespace CFSM
         protected bool Interruptable;
         protected IStateMachine fsm;
         protected Utils.SortedArray<QueueValue> StateTransQueue = new Utils.SortedArray<QueueValue>(
-            (v1, v2) => v1.priority <= v2.priority
+            (v1, v2) => v1.priority >= v2.priority
             );
+        protected int ListenShield = 0;
 
         public BaseState(IStateMachine fsm)
         {
@@ -40,16 +41,20 @@ namespace CFSM
             );
         }
 
-        protected void Listen()
+        protected bool Listen()
         {
             foreach(QueueValue v in StateTransQueue)
             {
-                if (v.listen.Invoke())
+                if(v.priority > ListenShield)
                 {
-                    v.transAction?.Invoke();
-                    return;
+                    if (v.listen.Invoke())
+                    {
+                        v.transAction?.Invoke();
+                        return true;
+                    }
                 }
             }
+            return false;
         }
 
         public abstract void Enter();

@@ -40,13 +40,28 @@ namespace Utils
             horizontal = Vector2.Dot(LocomotionDir, right);
         }
 
-        public static Quaternion GetPlayerRotationAngle(Transform camera ,float vertical, float horizontal, Vector3 forward)
+        public static Quaternion GetPlayerRotation(Transform camera ,float vertical, float horizontal, Vector3 forward)
         {
             Vector3 lookDir = camera.forward * vertical + camera.right * horizontal;
             lookDir.Normalize();
             forward.Normalize();
             Quaternion rotation = Quaternion.LookRotation(forward, lookDir);
             return rotation;
+        }
+    
+        public static float GetPlayerRotationAngle(Vector3 lookDir, Vector3 playerForward, Vector3 normal)
+        {
+            lookDir.Normalize();
+            playerForward.Normalize();
+            normal.Normalize();
+            lookDir = lookDir - (Vector3.Dot(lookDir, normal) * normal);
+            lookDir.Normalize();
+            float angle = Mathf.Acos(Vector3.Dot(lookDir, playerForward));
+            angle = angle / Mathf.PI / 2 * 360;
+            float t = Vector3.Dot(normal, Vector3.Cross(playerForward, lookDir));
+            if (t < 0)
+                angle = -angle;
+            return angle;
         }
     }
 }

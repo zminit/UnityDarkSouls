@@ -6,6 +6,11 @@ using UnityEngine;
 
 namespace CFSM
 {
+    public enum CharacterStateType
+    {
+        LocomotionState,
+        JumpState
+    }
     public class BlackBoard
     {
         private Dictionary<string, object> board = new();
@@ -55,6 +60,7 @@ namespace CFSM
             bb = new BlackBoard();
             StateTable = new Dictionary<int, BaseState>();
             StateTable[0] = new LocomotionState(this);
+            StateTable[1] = new JumpState(this);
         }
 
         void Start()
