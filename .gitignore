@@ -11,6 +11,8 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 /_UnusedResources/
+/[Aa]ssets/_LocalResources/
+/[Aa]ssets/_LocalResources.meta
 *.log
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
