@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using CFSM;
 using UnityEngine;
 
 public class PlayerManager : MonoBehaviour
 {
     Rigidbody rb;
+    Animator animator;
+    CFSM.CharacterFSM characterFSM;
 
     public OnLandHandler OnLandHandler;
 
@@ -25,23 +28,178 @@ public class PlayerManager : MonoBehaviour
     bool showFootGroundRays;
     [SerializeField]
     float LandCheckBias;
+
+    [Header("Weapon Animation")]
+    [SerializeField]
+    bool isArmed = true;
+    [SerializeField]
+    string upperBodyLayerName = "Upper Body Layer";
+    [SerializeField]
+    string drawAnimationName = "DrawSword";
+    [SerializeField]
+    string sheatheAnimationName = "SheatheSword";
+    [SerializeField]
+    float upperBodyWeightBlendSpeed = 8f;
+    [SerializeField]
+    float sheatheFallbackDuration = 1.0f;
+
+    int upperBodyLayerIndex = -1;
+    float upperBodyLayerWeight;
+    WeaponActionState weaponActionState = WeaponActionState.None;
+    float weaponActionStartedAt;
     #endregion
+
+    public bool IsArmed => isArmed;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        animator = GetComponentInChildren<Animator>();
+        characterFSM = GetComponent<CFSM.CharacterFSM>();
         OnLandHandler = new OnLandHandler(LeftFoot, RightFoot);
+        CacheUpperBodyLayer();
+        upperBodyLayerWeight = isArmed ? 1f : 0f;
+        ApplyUpperBodyLayerWeight();
         SyncGroundRayDebugSettings();
     }
 
     private void Update()
     {
         SyncGroundRayDebugSettings();
+        TickWeaponAction();
+        UpdateUpperBodyLayerWeight();
     }
 
     private void OnValidate()
     {
         SyncGroundRayDebugSettings();
+    }
+
+    public bool RequestToggleWeapon()
+    {
+        if (!CanToggleWeapon())
+            return false;
+
+        if (isArmed)
+            return RequestSheatheWeapon();
+
+        return RequestDrawWeapon();
+    }
+
+    public void SetArmed(bool armed)
+    {
+        if (weaponActionState != WeaponActionState.None)
+            return;
+
+        isArmed = armed;
+    }
+
+    bool RequestSheatheWeapon()
+    {
+        if (!isArmed || weaponActionState != WeaponActionState.None)
+            return false;
+
+        if (!TryPlayWeaponAction(sheatheAnimationName))
+            return false;
+
+        weaponActionState = WeaponActionState.Sheathing;
+        weaponActionStartedAt = Time.time;
+        return true;
+    }
+
+    bool RequestDrawWeapon()
+    {
+        if (isArmed || weaponActionState != WeaponActionState.None)
+            return false;
+
+        if (!TryPlayWeaponAction(drawAnimationName))
+            return false;
+
+        weaponActionState = WeaponActionState.Drawing;
+        weaponActionStartedAt = Time.time;
+        return true;
+    }
+
+    bool TryPlayWeaponAction(string animationName)
+    {
+        CacheUpperBodyLayer();
+        if (animator == null || upperBodyLayerIndex < 0 || string.IsNullOrEmpty(animationName))
+            return false;
+
+        int shortNameHash = Animator.StringToHash(animationName);
+        int fullPathHash = Animator.StringToHash($"{upperBodyLayerName}.{animationName}");
+        if (!animator.HasState(upperBodyLayerIndex, shortNameHash)
+            && !animator.HasState(upperBodyLayerIndex, fullPathHash))
+            return false;
+
+        animator.CrossFade(animationName, 0.1f, upperBodyLayerIndex);
+        return true;
+    }
+
+    bool CanToggleWeapon()
+    {
+        if (characterFSM == null)
+            return true;
+
+        return characterFSM.CurrentStateType == CharacterStateType.Locomotion;
+    }
+
+    void TickWeaponAction()
+    {
+        if (weaponActionState == WeaponActionState.None)
+            return;
+
+        if (weaponActionState == WeaponActionState.Sheathing && HasWeaponAnimationFinished(sheatheAnimationName))
+        {
+            isArmed = false;
+            weaponActionState = WeaponActionState.None;
+        }
+        else if (weaponActionState == WeaponActionState.Drawing && HasWeaponAnimationFinished(drawAnimationName))
+        {
+            isArmed = true;
+            weaponActionState = WeaponActionState.None;
+        }
+    }
+
+    bool HasWeaponAnimationFinished(string animationName)
+    {
+        if (animator == null || upperBodyLayerIndex < 0)
+            return Time.time - weaponActionStartedAt >= sheatheFallbackDuration;
+
+        AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(upperBodyLayerIndex);
+        bool animationMatchedAndFinished = info.IsName(animationName) && info.normalizedTime >= 0.95f;
+        bool timedOut = Time.time - weaponActionStartedAt >= sheatheFallbackDuration;
+        return animationMatchedAndFinished || timedOut;
+    }
+
+    void UpdateUpperBodyLayerWeight()
+    {
+        CacheUpperBodyLayer();
+        if (animator == null || upperBodyLayerIndex < 0)
+            return;
+
+        float targetWeight = weaponActionState != WeaponActionState.None || isArmed ? 1f : 0f;
+        upperBodyLayerWeight = Mathf.MoveTowards(
+            upperBodyLayerWeight,
+            targetWeight,
+            upperBodyWeightBlendSpeed * Time.deltaTime);
+        ApplyUpperBodyLayerWeight();
+    }
+
+    void ApplyUpperBodyLayerWeight()
+    {
+        if (animator != null && upperBodyLayerIndex >= 0)
+            animator.SetLayerWeight(upperBodyLayerIndex, upperBodyLayerWeight);
+    }
+
+    void CacheUpperBodyLayer()
+    {
+        if (animator == null)
+            return;
+
+        upperBodyLayerIndex = string.IsNullOrEmpty(upperBodyLayerName)
+            ? -1
+            : animator.GetLayerIndex(upperBodyLayerName);
     }
 
     private void OnDrawGizmosSelected()
@@ -72,6 +230,13 @@ public class PlayerManager : MonoBehaviour
         bool hitGround = Physics.Raycast(rayOrigin, Vector3.down, rayLength, 1);
         Gizmos.color = hitGround ? Color.green : Color.red;
         Gizmos.DrawLine(rayOrigin, rayOrigin + Vector3.down * rayLength);
+    }
+
+    enum WeaponActionState
+    {
+        None,
+        Drawing,
+        Sheathing
     }
 
     public void Move(Vector3 moveDir, float speed, Vector3 normal)

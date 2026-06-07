@@ -93,7 +93,7 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
             ""actions"": [
                 {
                     ""name"": ""Move"",
-                    ""type"": ""PassThrough"",
+                    ""type"": ""Value"",
                     ""id"": ""ad0f3aa2-185b-4bd1-a6a9-06d8ff9f4d5b"",
                     ""expectedControlType"": ""Vector2"",
                     ""processors"": """",
@@ -185,6 +185,15 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
                     ""name"": ""Alt"",
                     ""type"": ""Button"",
                     ""id"": ""1487e823-b633-4c85-a6a4-b63901de8ddf"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Sheathe"",
+                    ""type"": ""Button"",
+                    ""id"": ""b05d8bac-0b1b-4a61-a905-4d79f95cfb81"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -525,7 +534,7 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""ba1aee8b-e9b6-4f70-8be5-a6f50a95e15b"",
-                    ""path"": ""<Mouse>/leftButton"",
+                    ""path"": ""<Mouse>/rightButton"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -591,7 +600,7 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""d849aff9-0ba3-49e5-a9d9-22a430473d18"",
-                    ""path"": ""<Mouse>/rightButton"",
+                    ""path"": ""<Mouse>/leftButton"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -607,6 +616,28 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""Alt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""3e436377-b28b-4e3f-8108-789353ded64b"",
+                    ""path"": ""<Keyboard>/escape"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Sheathe"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""973005bb-0ccd-48ae-bbd8-e0a98de89f1f"",
+                    ""path"": ""<NimbusGamepadHid>/buttonNorth"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Sheathe"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1205,6 +1236,7 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
         m_Player_LB = m_Player.FindAction("LB", throwIfNotFound: true);
         m_Player_LT = m_Player.FindAction("LT", throwIfNotFound: true);
         m_Player_Alt = m_Player.FindAction("Alt", throwIfNotFound: true);
+        m_Player_Sheathe = m_Player.FindAction("Sheathe", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1309,6 +1341,7 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_LB;
     private readonly InputAction m_Player_LT;
     private readonly InputAction m_Player_Alt;
+    private readonly InputAction m_Player_Sheathe;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1364,6 +1397,10 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Alt".
         /// </summary>
         public InputAction @Alt => m_Wrapper.m_Player_Alt;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/Sheathe".
+        /// </summary>
+        public InputAction @Sheathe => m_Wrapper.m_Player_Sheathe;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1423,6 +1460,9 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
             @Alt.started += instance.OnAlt;
             @Alt.performed += instance.OnAlt;
             @Alt.canceled += instance.OnAlt;
+            @Sheathe.started += instance.OnSheathe;
+            @Sheathe.performed += instance.OnSheathe;
+            @Sheathe.canceled += instance.OnSheathe;
         }
 
         /// <summary>
@@ -1467,6 +1507,9 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
             @Alt.started -= instance.OnAlt;
             @Alt.performed -= instance.OnAlt;
             @Alt.canceled -= instance.OnAlt;
+            @Sheathe.started -= instance.OnSheathe;
+            @Sheathe.performed -= instance.OnSheathe;
+            @Sheathe.canceled -= instance.OnSheathe;
         }
 
         /// <summary>
@@ -1844,6 +1887,13 @@ public partial class @PlayerControlls: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnAlt(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Sheathe" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSheathe(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.

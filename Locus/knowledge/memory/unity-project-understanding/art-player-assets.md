@@ -9,17 +9,21 @@ commandEnabled: false
 readOnly: false
 inheritAiConfig: true
 createdAt: 1780407548996
-updatedAt: 1780459331477
+updatedAt: 1780834787295
 ---
 
 # art-player-assets
 
 ## Summary
-Player art assets, material assignments, and URP pipeline dependency after resource normalization.
+Player art assets, material assignments, player Animator Controller lookup, Upper Body Layer locomotion Blend Tree mapping, and URP pipeline dependency after resource normalization.
 
 <!-- locus:body:start -->
 - Active scene `Assets/Scenes/MainScene.unity` uses `Player/ModelRoot/PlayerModel/H_Ace_01` with a SkinnedMeshRenderer.
+- `Player/ModelRoot/PlayerModel` has the Animator component. Its controller is `Assets/Setting/PlayerAnimationController.controller`, and its avatar comes from `Assets/Art/Characters/Player/CH_Player_Body_LOD0.FBX`.
 - Player model prefab is `Assets/Art/Prefabs/Characters/Player/PF_Player_Model.prefab`, depending on model `Assets/Art/Characters/Player/CH_Player_Body_LOD0.FBX`.
+- `PlayerAnimationController.controller` has `Base Layer` plus `Upper Body Layer`. `Upper Body Layer` uses `Assets/Art/Animations/Shared/Masks/AN_Shared_Player_UpperBody_Mask.mask` at weight 1 and contains `LocomotionWithWeapon`, `DrawSword`, and `SheatheSword` states.
+- `Upper Body Layer/LocomotionWithWeapon` is a `FreeformDirectional2D` Blend Tree driven by `Horizontal` / `Vertical` with 17 children: idle at `(0,0)`, walk directions at radius 1, and run directions at radius 2.
+- `LocomotionWithWeapon` uses Katana IP locomotion clips under `Assets/Art/Animations/Player/Locomotion/Katana/`. Forward walk/run use `AN_Player_Katana_Strafe_Walk_F_Loop_IP.anim` and `AN_Player_Katana_Strafe_Run_F_Loop_IP.anim` because exact `..._Walk_F_IP` and `..._Run_F_IP` assets are absent.
 - Player Ace texture assets are under `Assets/Art/Textures/Characters/Player/Ace/`, e.g. `TEX_Player_Ace_Cloth00_BC.tga`, `_N`, `_R`; `Cloth01`, `Cloth02`, `Eye_BC`, `Hair_BC`, `Skin_BC/N/R`, `Weapon_BC/N/R`.
 - Weapon Ace textures are under `Assets/Art/Textures/Weapons/Ace/`, e.g. `TEX_Weapon_Ace_Bow_BC/N/R` and `TEX_Weapon_Ace_Arrow_BC/N/R`.
 - Player Ace body material assets are under `Assets/Art/Materials/Characters/Player/Ace/`. `H_Ace_01` uses six explicit material slots: `MAT_Player_Ace_Hair_Opaque.mat`, `MAT_Player_Ace_Skin_Opaque.mat`, `MAT_Player_Ace_Eye_Transparent.mat`, `MAT_Player_Ace_Cloth00_Opaque.mat`, `MAT_Player_Ace_Cloth01_Opaque.mat`, and `MAT_Player_Ace_Cloth02_Opaque.mat`.

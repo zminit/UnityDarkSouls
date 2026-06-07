@@ -408,7 +408,8 @@ namespace CFSM
         {
             return ctx.currentStateType != CharacterStateType.Jump
                 && ctx.currentStateType != CharacterStateType.Airborne
-                && ctx.currentStateType != CharacterStateType.Hit;
+                && ctx.currentStateType != CharacterStateType.Hit
+                && ctx.currentStateType != CharacterStateType.Dodge;
         }
     }
 }

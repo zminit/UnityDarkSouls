@@ -96,6 +96,9 @@ public class PlayerInputAdapter : MonoBehaviour, IStateRequestSource
         ctx.blackBoard.SetValue("GuardPressed", input.Guard.IsPressed);
         ctx.blackBoard.SetValue("MoveMode", moveMode);
 
+        if (input.Sheathe.WasPressedThisFrame && ctx.playerManager != null)
+            ctx.playerManager.RequestToggleWeapon();
+
         results.Add(StateRequest.Create(
             StateRequestType.Move,
             CharacterStateType.Locomotion,

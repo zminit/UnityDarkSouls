@@ -7,7 +7,7 @@
             "actions": [
                 {
                     "name": "Move",
-                    "type": "PassThrough",
+                    "type": "Value",
                     "id": "ad0f3aa2-185b-4bd1-a6a9-06d8ff9f4d5b",
                     "expectedControlType": "Vector2",
                     "processors": "",
@@ -99,6 +99,15 @@
                     "name": "Alt",
                     "type": "Button",
                     "id": "1487e823-b633-4c85-a6a4-b63901de8ddf",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Sheathe",
+                    "type": "Button",
+                    "id": "b05d8bac-0b1b-4a61-a905-4d79f95cfb81",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -439,7 +448,7 @@
                 {
                     "name": "",
                     "id": "ba1aee8b-e9b6-4f70-8be5-a6f50a95e15b",
-                    "path": "<Mouse>/leftButton",
+                    "path": "<Mouse>/rightButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -505,7 +514,7 @@
                 {
                     "name": "",
                     "id": "d849aff9-0ba3-49e5-a9d9-22a430473d18",
-                    "path": "<Mouse>/rightButton",
+                    "path": "<Mouse>/leftButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -521,6 +530,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "Alt",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3e436377-b28b-4e3f-8108-789353ded64b",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Sheathe",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "973005bb-0ccd-48ae-bbd8-e0a98de89f1f",
+                    "path": "<NimbusGamepadHid>/buttonNorth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Sheathe",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

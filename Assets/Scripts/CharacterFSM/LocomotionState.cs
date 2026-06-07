@@ -1,3 +1,5 @@
+#define CHARACTER_FSM_DEBUG
+
 using UnityEngine;
 
 namespace CFSM
@@ -7,6 +9,12 @@ namespace CFSM
     /// </summary>
     public class LocomotionState : CharacterStateBase
     {
+#if CHARACTER_FSM_DEBUG
+        private const float DebugWorldMoveDirArrowLength = 1.5f;
+        private const float DebugWorldMoveDirArrowHeadLength = 0.3f;
+        private const float DebugWorldMoveDirArrowHeadAngle = 25f;
+#endif
+
         /// <summary>状态机引用，用于读取 Inspector 中配置的动画名并播放动画。</summary>
         private readonly CharacterFSM machine;
 
@@ -66,21 +74,52 @@ namespace CFSM
 
             UpdateLocomotionAnimation(ctx, false);
 
-            Vector2 locomotionDir = GetCameraRelativeInput(ctx);
-            Vector2 modelForward = new Vector2(ctx.playerTransform.forward.x, ctx.playerTransform.forward.z).normalized;
+            if (ShouldUseStrafeMove(ctx))
+            {
+                UpdateStrafeAnimatorParameters(ctx);
+                return;
+            }
+
+            UpdateFreeMoveAnimatorParameters(ctx);
+        }
+
+        private static void UpdateFreeMoveAnimatorParameters(StateContext ctx)
+        {
+            float vertical = ctx.movementAmount > 0.05f ? GetAnimatorSpeedScale(ctx) : 0f;
+            float horizontal = 0f;
+
+            ctx.animator.SetFloat("Vertical", Mathf.Lerp(ctx.animator.GetFloat("Vertical"), vertical, Time.deltaTime * 10f));
+            ctx.animator.SetFloat("Horizontal", Mathf.Lerp(ctx.animator.GetFloat("Horizontal"), horizontal, Time.deltaTime * 10f));
+        }
+
+        private static void UpdateStrafeAnimatorParameters(StateContext ctx)
+        {
+            if (ctx.movementAmount <= 0.05f)
+            {
+                ctx.animator.SetFloat("Vertical", Mathf.Lerp(ctx.animator.GetFloat("Vertical"), 0f, Time.deltaTime * 10f));
+                ctx.animator.SetFloat("Horizontal", Mathf.Lerp(ctx.animator.GetFloat("Horizontal"), 0f, Time.deltaTime * 10f));
+                return;
+            }
+
+            Vector3 worldMoveDir = GetCameraRelativeMoveDirection(ctx);
+            Vector3 localMoveDir = ctx.playerTransform.InverseTransformDirection(worldMoveDir.normalized);
 
             float speedScale = GetAnimatorSpeedScale(ctx);
-            Utils.PlayerLocomotion.HandleAnimatorInputByLocomotionInput(
-                modelForward,
-                locomotionDir * speedScale,
-                out float vertical,
-                out float horizontal);
+            float horizontal = localMoveDir.x * speedScale;
+            float vertical = localMoveDir.z * speedScale;
 
             vertical = Mathf.Clamp(vertical, -speedScale, speedScale);
             horizontal = Mathf.Clamp(horizontal, -speedScale, speedScale);
 
             ctx.animator.SetFloat("Vertical", Mathf.Lerp(ctx.animator.GetFloat("Vertical"), vertical, Time.deltaTime * 10f));
             ctx.animator.SetFloat("Horizontal", Mathf.Lerp(ctx.animator.GetFloat("Horizontal"), horizontal, Time.deltaTime * 10f));
+        }
+
+        private static bool ShouldUseStrafeMove(StateContext ctx)
+        {
+            return ctx.blackBoard != null
+                && ctx.blackBoard.TryGetValue("UseStrafeMove", out bool useStrafeMove)
+                && useStrafeMove;
         }
 
         /// <summary>
@@ -97,11 +136,16 @@ namespace CFSM
                 return;
             }
 
+            bool useStrafeMove = ShouldUseStrafeMove(ctx);
             Vector3 moveDir = GetCameraRelativeMoveDirection(ctx);
             if (moveDir.sqrMagnitude <= 0.0001f)
                 return;
 
-            if (ctx.playerManager.canRotate)
+#if CHARACTER_FSM_DEBUG
+            DrawWorldMoveDirection(ctx, moveDir);
+#endif
+
+            if (!useStrafeMove && ctx.playerManager.canRotate)
                 ctx.playerManager.LookRotate(moveDir, Vector3.up);
 
             ctx.playerManager.Move(moveDir, GetMoveSpeed(ctx), Vector3.up);
@@ -172,18 +216,6 @@ namespace CFSM
         }
 
         /// <summary>
-        /// 获取相机相对输入方向，用于 Animator 参数计算。
-        /// </summary>
-        private static Vector2 GetCameraRelativeInput(StateContext ctx)
-        {
-            if (ctx.mainCamera == null)
-                return ctx.moveInput.normalized;
-
-            Vector3 moveDir = GetCameraRelativeMoveDirection(ctx);
-            return new Vector2(moveDir.x, moveDir.z);
-        }
-
-        /// <summary>
         /// 将输入轴转换为世界空间中的相机相对移动方向。
         /// </summary>
         private static Vector3 GetCameraRelativeMoveDirection(StateContext ctx)
@@ -202,5 +234,30 @@ namespace CFSM
 
             return moveDir;
         }
+
+#if CHARACTER_FSM_DEBUG
+        private static void DrawWorldMoveDirection(StateContext ctx, Vector3 worldMoveDir)
+        {
+            if (ctx.playerTransform == null || worldMoveDir.sqrMagnitude <= 0.0001f)
+                return;
+
+            Vector3 direction = worldMoveDir.normalized;
+            Vector3 origin = ctx.playerBody != null
+                ? ctx.playerBody.worldCenterOfMass
+                : ctx.playerTransform.position + Vector3.up;
+
+            Vector3 tip = origin + direction * DebugWorldMoveDirArrowLength;
+            Vector3 leftHead = Quaternion.AngleAxis(180f - DebugWorldMoveDirArrowHeadAngle, Vector3.up)
+                * direction
+                * DebugWorldMoveDirArrowHeadLength;
+            Vector3 rightHead = Quaternion.AngleAxis(180f + DebugWorldMoveDirArrowHeadAngle, Vector3.up)
+                * direction
+                * DebugWorldMoveDirArrowHeadLength;
+
+            Debug.DrawLine(origin, tip, Color.red, Time.fixedDeltaTime);
+            Debug.DrawLine(tip, tip + leftHead, Color.red, Time.fixedDeltaTime);
+            Debug.DrawLine(tip, tip + rightHead, Color.red, Time.fixedDeltaTime);
+        }
+#endif
     }
 }

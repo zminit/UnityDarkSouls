@@ -152,6 +152,11 @@ public class InputReader : MonoBehaviour, PlayerControlls.IPlayerActions, Player
         UpdateButton(player.Alt, context);
     }
 
+    public void OnSheathe(InputAction.CallbackContext context)
+    {
+        UpdateButton(player.Sheathe, context);
+    }
+
     public void OnNavigate(InputAction.CallbackContext context)
     {
         ui.SetNavigate(context.canceled ? Vector2.zero : context.ReadValue<Vector2>());

@@ -1,26 +1,17 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class AnimationMoveHandler : MonoBehaviour
 {
-    public Animator animator;
-    public Transform ModelRoot;
+    [SerializeField]
+    Animator animator;
 
-    private void Awake()
-    {
-        animator = GetComponent<Animator>();
-        ModelRoot = transform.parent;
-    }
-
-    private void Start()
-    {
-    }
+    /// <summary>
+    /// Root motion is now owned by the character state machine and PlayerManager.
+    /// This component is kept as a scene-compatible stub so old scene references do not become missing scripts.
+    /// </summary>
     private void OnAnimatorMove()
     {
-        Vector3 deltaPos = animator.deltaPosition;
-        Quaternion deltaRot = animator.deltaRotation;
-        ModelRoot.position += deltaPos;
-        ModelRoot.rotation *= deltaRot;
+        if (animator == null)
+            animator = GetComponent<Animator>();
     }
 }

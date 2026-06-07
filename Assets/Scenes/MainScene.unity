@@ -5510,11 +5510,17 @@ MonoBehaviour:
   WalkSpeed: 0.5
   RunSpeed: 2
   SprintSpeed: 5
-  canRotate: 1
+  canRotate: 0
   LeftFoot: {fileID: 537983313}
   RightFoot: {fileID: 29044651}
   showFootGroundRays: 1
   LandCheckBias: 0.1
+  isArmed: 0
+  upperBodyLayerName: Upper Body
+  drawAnimationName: DrawSword
+  sheatheAnimationName: SheatheWeapon
+  upperBodyWeightBlendSpeed: 8
+  sheatheFallbackDuration: 1
 --- !u!4 &5832597371039303556
 Transform:
   m_ObjectHideFlags: 0

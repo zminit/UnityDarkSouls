@@ -71,6 +71,7 @@ public class PlayerInputSnapshot
     [field: SerializeField] public InputButtonState Alt { get; private set; } = new InputButtonState();
     [field: SerializeField] public InputButtonState Crouch { get; private set; } = new InputButtonState();
     [field: SerializeField] public InputButtonState LeftTrigger { get; private set; } = new InputButtonState();
+    [field: SerializeField] public InputButtonState Sheathe { get; private set; } = new InputButtonState();
 
     public void SetMove(Vector2 value)
     {
@@ -94,6 +95,7 @@ public class PlayerInputSnapshot
         Alt.Tick(deltaTime);
         Crouch.Tick(deltaTime);
         LeftTrigger.Tick(deltaTime);
+        Sheathe.Tick(deltaTime);
     }
 
     public void ClearFrameState()
@@ -107,6 +109,7 @@ public class PlayerInputSnapshot
         Alt.ClearFrameState();
         Crouch.ClearFrameState();
         LeftTrigger.ClearFrameState();
+        Sheathe.ClearFrameState();
     }
 
     public void Reset()
@@ -122,6 +125,7 @@ public class PlayerInputSnapshot
         Alt.Reset();
         Crouch.Reset();
         LeftTrigger.Reset();
+        Sheathe.Reset();
     }
 }
 
