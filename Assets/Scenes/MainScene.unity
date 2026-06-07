@@ -313,7 +313,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BindingMode: 5
-  m_FollowOffset: {x: 0, y: 0, z: -1.3}
+  m_FollowOffset: {x: 0, y: 3.6, z: -1.75}
   m_XDamping: 1
   m_YDamping: 1
   m_ZDamping: 1
@@ -378,6 +378,7 @@ GameObject:
   - component: {fileID: 312093171}
   - component: {fileID: 312093170}
   - component: {fileID: 312093169}
+  - component: {fileID: 312093173}
   m_Layer: 0
   m_Name: MainCamera
   m_TagString: MainCamera
@@ -437,7 +438,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -486,13 +487,57 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 312093168}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.44563127, y: 0.012735381, z: 0.006340366, w: 0.89510363}
-  m_LocalPosition: {x: 0, y: 1.8, z: -1.3}
+  m_LocalRotation: {x: 0.42577025, y: 0.009563639, z: -0.004500497, w: 0.9047696}
+  m_LocalPosition: {x: 0, y: 5.3999996, z: -1.75}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 16.635, y: 0, z: 0}
+--- !u!114 &312093173
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 312093168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_Version: 2
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
 --- !u!1 &388244883
 GameObject:
   m_ObjectHideFlags: 0
@@ -919,7 +964,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 660010292}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.4456313, y: 0.012735436, z: 0.0063403933, w: 0.8951036}
+  m_LocalRotation: {x: 0.39262357, y: 0.009720807, z: -0.0041501285, w: 0.9196385}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1174,7 +1219,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BindingMode: 5
-  m_FollowOffset: {x: 0, y: 0, z: -1.3}
+  m_FollowOffset: {x: 0, y: 3.6, z: -1.75}
   m_XDamping: 1
   m_YDamping: 1
   m_ZDamping: 1
@@ -1302,7 +1347,7 @@ MonoBehaviour:
         m_Calls: []
   m_LegacyBlendHint: 0
   m_YAxis:
-    Value: 0
+    Value: 1
     m_SpeedMode: 0
     m_MaxSpeed: 2
     m_AccelTime: 0.2
@@ -1376,7 +1421,7 @@ Transform:
   m_GameObject: {fileID: 992866077}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.8, z: -1.3}
+  m_LocalPosition: {x: 0, y: 5.3999996, z: -1.75}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1541,7 +1586,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1282180237}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.41282263, y: 0.012957346, z: 0.0058735954, w: 0.9107004}
+  m_LocalRotation: {x: 0.42577028, y: 0.009563639, z: -0.0045004976, w: 0.9047696}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -1731,7 +1776,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BindingMode: 5
-  m_FollowOffset: {x: 0, y: 0, z: -1.3}
+  m_FollowOffset: {x: 0, y: 3.6, z: -1.75}
   m_XDamping: 1
   m_YDamping: 1
   m_ZDamping: 1
@@ -1855,7 +1900,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1839085315}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.4293195, y: 0.012848364, z: 0.006108311, w: 0.90304065}
+  m_LocalRotation: {x: 0.4092425, y: 0.009643918, z: -0.0043257945, w: 0.9123644}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -5385,7 +5430,6 @@ GameObject:
   m_Component:
   - component: {fileID: 3623886331990000445}
   - component: {fileID: 5794429752794480344}
-  - component: {fileID: 5794429752794480343}
   - component: {fileID: 5794429752794480342}
   - component: {fileID: 5794429752794480341}
   m_Layer: 6
@@ -5434,34 +5478,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 41e8ca7db58350d459bea643f106dd2a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 0}
-  playerManager: {fileID: 0}
-  playerTransform: {fileID: 0}
-  playerBody: {fileID: 0}
-  mainCamera: {fileID: 0}
-  animator: {fileID: 0}
-  inputHandler: {fileID: 0}
---- !u!114 &5794429752794480343
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5794429752794480340}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 280c0e76e09707a46b2531e557173f1a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  vertical: 0
-  horizontal: 0
-  playerMovement: {x: 0, y: 0}
-  Movement: 0
-  B_Input: 0
-  Alt_Input: 0
-  A_Input: 0
-  A_Input_Time: 0
-  B_Input_Time: 0
+  currentStateType: 0
+  currentStateName: 
+  bufferDuration: 0.2
+  locomotionAnimation: CommonLocomotion
+  sprintAnimation: Sprinting
+  jumpStartAnimation: JumpStart
+  jumpLoopAnimation: Jumping
+  landingAnimation: Landing
+  lightAttackAnimation: Attack_Light
+  heavyAttackAnimation: Attack_Heavy
+  airAttackAnimation: Attack_Air
+  guardAnimation: Guard
+  dodgeAnimation: Dodge
+  hitAnimation: Hit
+  airborneAnimation: Airborne
+  dodgeSpeed: 7.5
+  dodgeDuration: 0.35
 --- !u!114 &5794429752794480344
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5480,6 +5513,8 @@ MonoBehaviour:
   canRotate: 1
   LeftFoot: {fileID: 537983313}
   RightFoot: {fileID: 29044651}
+  showFootGroundRays: 1
+  LandCheckBias: 0.1
 --- !u!4 &5832597371039303556
 Transform:
   m_ObjectHideFlags: 0

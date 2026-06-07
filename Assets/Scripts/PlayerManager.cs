@@ -1,19 +1,17 @@
-using System;
+ï»¿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerManager : MonoBehaviour
 {
-    InputHandler inputHandler;
     Rigidbody rb;
 
     public OnLandHandler OnLandHandler;
 
-
     #region Properties
-    public float WalkSpeed = 0.5f; 
-    public float RunSpeed  = 2.0f; 
+    public float WalkSpeed = 0.5f;
+    public float RunSpeed = 2.0f;
     public float SprintSpeed = 5.0f;
     public bool canRotate = true;
 
@@ -21,30 +19,69 @@ public class PlayerManager : MonoBehaviour
     Transform LeftFoot;
     [SerializeField]
     Transform RightFoot;
+
+    [Header("Ground Check Debug")]
+    [SerializeField]
+    bool showFootGroundRays;
+    [SerializeField]
+    float LandCheckBias;
     #endregion
+
     private void Awake()
     {
-        inputHandler = GetComponent<InputHandler>();
         rb = GetComponent<Rigidbody>();
         OnLandHandler = new OnLandHandler(LeftFoot, RightFoot);
+        SyncGroundRayDebugSettings();
     }
 
-    void Start()
+    private void Update()
     {
+        SyncGroundRayDebugSettings();
     }
 
-    void Update()
+    private void OnValidate()
     {
-        inputHandler.TickUp(Time.deltaTime);
+        SyncGroundRayDebugSettings();
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!showFootGroundRays)
+            return;
+
+        DrawFootGroundRayGizmo(LeftFoot, LandCheckBias);
+        DrawFootGroundRayGizmo(RightFoot, LandCheckBias);
+    }
+
+    private void SyncGroundRayDebugSettings()
+    {
+        if (OnLandHandler == null)
+            return;
+
+        OnLandHandler.DrawDebugRays = showFootGroundRays;
+        OnLandHandler.LandCheckBias = LandCheckBias;
+    }
+
+    private static void DrawFootGroundRayGizmo(Transform foot, float landCheckBias)
+    {
+        if (foot == null)
+            return;
+
+        float rayLength = OnLandHandler.GroundCheckRayLength;
+        Vector3 rayOrigin = foot.position + Vector3.up * landCheckBias;
+        bool hitGround = Physics.Raycast(rayOrigin, Vector3.down, rayLength, 1);
+        Gizmos.color = hitGround ? Color.green : Color.red;
+        Gizmos.DrawLine(rayOrigin, rayOrigin + Vector3.down * rayLength);
     }
 
     public void Move(Vector3 moveDir, float speed, Vector3 normal)
     {
         moveDir.Normalize();
         moveDir *= speed;
-        moveDir = Vector3.ProjectOnPlane(moveDir, normal); // È·±£ÒÆ¶¯·½ÏòÔÚµØÃæÉÏ
-        rb.velocity = moveDir; // ÉèÖÃ¸ÕÌåËÙ¶ÈÒÔÊµÏÖÒÆ¶¯
+        moveDir = Vector3.ProjectOnPlane(moveDir, normal); // ç¡®ä¿ç§»åŠ¨æ–¹å‘åœ¨åœ°é¢ä¸Š
+        rb.velocity = moveDir; // è®¾ç½®åˆšä½“é€Ÿåº¦ä»¥å®žçŽ°ç§»åŠ¨
     }
+
     public void LookRotate(Vector3 lookDir, Vector3 normal)
     {
         if (lookDir.sqrMagnitude > 0.1f)
@@ -52,7 +89,7 @@ public class PlayerManager : MonoBehaviour
             lookDir.Normalize();
             lookDir = lookDir - (normal * (Vector3.Dot(normal, lookDir)));
             Quaternion targetRotation = Quaternion.LookRotation(lookDir, normal);
-            rb.rotation = Quaternion.Slerp(rb.rotation, targetRotation, Time.deltaTime * 5f); // Æ½»¬Ðý×ª
+            rb.rotation = Quaternion.Slerp(rb.rotation, targetRotation, Time.deltaTime * 5f); // å¹³æ»‘æ—‹è½¬
         }
     }
 }

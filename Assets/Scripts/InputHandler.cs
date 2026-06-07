@@ -1,9 +1,5 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using Utils; // Assuming you have a namespace for utility functions
 
 public class InputHandler : MonoBehaviour
 {
@@ -24,57 +20,126 @@ public class InputHandler : MonoBehaviour
     public Action A_Input_Started;
     public Action A_Input_Canceled;
 
-    private PlayerControlls inputActions;
+    [SerializeField] private InputReader inputReader;
+
+    private int lastEventFrame = -1;
+
+    private void Awake()
+    {
+        EnsureInputReader();
+    }
 
     private void OnEnable()
     {
-        Alt_Started += () => Alt_Input = true;
-        Alt_Canceled += () => Alt_Input = false;
-        B_Input_Started += () => B_Input = true;
-        B_Input_Canceled += () => B_Input = false;
-        A_Input_Started += () => A_Input = true;
-        A_Input_Canceled += () => A_Input = false ;
-
-        if (inputActions == null)
-        {
-            inputActions = new PlayerControlls();
-            inputActions.Player.Alt.started += ctx => Alt_Started?.Invoke();
-            inputActions.Player.Alt.canceled += ctx => Alt_Canceled?.Invoke();
-            inputActions.Player.Sprint.started += ctx => B_Input_Started?.Invoke();
-            inputActions.Player.Sprint.canceled += ctx => B_Input_Canceled?.Invoke();
-            inputActions.Player.Jump.started += ctx => A_Input_Started?.Invoke();
-            inputActions.Player.Jump.canceled += ctx => A_Input_Canceled?.Invoke();
-            inputActions.Player.Move.performed += ctx => playerMovement = ctx.ReadValue<Vector2>();
-        }
-        inputActions.Enable();
+        EnsureInputReader();
     }
 
     private void OnDisable()
     {
-        inputActions.Disable();
+        ResetSnapshot();
     }
 
     public void TickUp(float delta)
     {
+        EnsureInputReader();
+
+        if (inputReader == null || !inputReader.AcceptsGameplayInput)
+        {
+            ResetSnapshot();
+            return;
+        }
+
+        PlayerInputSnapshot input = inputReader.Player;
+
+        DispatchFrameEvents(input);
+        SyncButtonValues(input);
+
+        playerMovement = input.Move;
         vertical = playerMovement.y;
         horizontal = playerMovement.x;
         HandleMove();
-        HandleB_Input(delta);
     }
 
-    private void HandleB_Input(float delta)
+    private void EnsureInputReader()
     {
-        if (B_Input)
+        if (inputReader != null)
+            return;
+
+        inputReader = GetComponent<InputReader>();
+        if (inputReader == null)
+            inputReader = gameObject.AddComponent<InputReader>();
+    }
+
+    private void DispatchFrameEvents(PlayerInputSnapshot input)
+    {
+        if (lastEventFrame == Time.frameCount)
+            return;
+
+        lastEventFrame = Time.frameCount;
+
+        if (input.Alt.WasPressedThisFrame)
         {
-            B_Input_Time += delta;
+            Alt_Input = true;
+            Alt_Started?.Invoke();
         }
-        else
+
+        if (input.Alt.WasReleasedThisFrame)
         {
-            B_Input_Time = 0.0f;
+            Alt_Input = false;
+            Alt_Canceled?.Invoke();
+        }
+
+        if (input.Sprint.WasPressedThisFrame)
+        {
+            B_Input = true;
+            B_Input_Time = input.Sprint.HeldTime;
+            B_Input_Started?.Invoke();
+        }
+
+        if (input.Sprint.WasReleasedThisFrame)
+        {
+            B_Input = false;
+            B_Input_Time = input.Sprint.HeldTime;
+            B_Input_Canceled?.Invoke();
+        }
+
+        if (input.Jump.WasPressedThisFrame)
+        {
+            A_Input = true;
+            A_Input_Time = input.Jump.HeldTime;
+            A_Input_Started?.Invoke();
+        }
+
+        if (input.Jump.WasReleasedThisFrame)
+        {
+            A_Input = false;
+            A_Input_Time = input.Jump.HeldTime;
+            A_Input_Canceled?.Invoke();
         }
     }
 
+    private void SyncButtonValues(PlayerInputSnapshot input)
+    {
+        Alt_Input = input.Alt.IsPressed;
+        B_Input = input.Sprint.IsPressed;
+        A_Input = input.Jump.IsPressed;
 
+        B_Input_Time = input.Sprint.IsPressed ? input.Sprint.HeldTime : 0f;
+        A_Input_Time = input.Jump.IsPressed ? input.Jump.HeldTime : 0f;
+    }
+
+    private void ResetSnapshot()
+    {
+        vertical = 0f;
+        horizontal = 0f;
+        playerMovement = Vector2.zero;
+        Movement = 0f;
+        B_Input = false;
+        Alt_Input = false;
+        A_Input = false;
+        A_Input_Time = 0f;
+        B_Input_Time = 0f;
+    }
 
     private void HandleMove()
     {

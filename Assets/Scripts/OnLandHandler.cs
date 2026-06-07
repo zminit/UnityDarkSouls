@@ -1,12 +1,18 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class OnLandHandler
 {
+    public const float GroundCheckRayLength = 1.0f;
+
     Transform LeftFoot;
     Transform RightFoot;
     int LayerMask = 1;
+
+    public bool DrawDebugRays { get; set; }
+
+    public float LandCheckBias { get; set; }
 
     public OnLandHandler(Transform LeftFoot, Transform RightFoot)
     {
@@ -15,21 +21,21 @@ public class OnLandHandler
     }
 
     /// <summary>
-    /// »ñÈ¡ÏÂÒ»¸öÂä½Åµã
+    /// è·å–ä¸‹ä¸€ä¸ªè½è„šç‚¹
     /// </summary>
-    /// <param name="moveDir">Î»ÒÆ</param>
-    /// <param name="pos">Êä³öÂä½ÅµãÎ»ÖÃ</param>
-    /// <returns>·µ»ØboolÖµ£¬´ú±íÊÇ·ñ¼ì²âµ½Âä½Å´¦</returns>
+    /// <param name="moveDir">ä½ç§»</param>
+    /// <param name="pos">è¾“å‡ºè½è„šç‚¹ä½ç½®</param>
+    /// <returns>è¿”å›boolå€¼ï¼Œä»£è¡¨æ˜¯å¦æ£€æµ‹åˆ°è½è„šå¤„</returns>
     public bool GetNextFeetPos(Vector3 moveDir, out Vector3 pos)
     {
         pos = Vector3.zero;
         Vector3 LtoR = (RightFoot.position - LeftFoot.position).normalized;
         LtoR = LtoR - (Vector3.Dot(LtoR, LeftFoot.up) * LeftFoot.up);
-        if(Vector3.Dot(LtoR ,LeftFoot.forward) > 0)
+        if (Vector3.Dot(LtoR, LeftFoot.forward) > 0)
         {
-            //ÓÒ½ÅÔÚÇ°
+            //å³è„šåœ¨å‰
             RaycastHit hitPoint;
-            if(Physics.Raycast(RightFoot.position + RightFoot.up * 0.5f, Vector3.down, out hitPoint, 1.5f, LayerMask))
+            if (Physics.Raycast(RightFoot.position + RightFoot.up * 0.5f, Vector3.down, out hitPoint, 1.5f, LayerMask))
             {
                 pos = hitPoint.point;
                 return true;
@@ -48,16 +54,24 @@ public class OnLandHandler
     }
 
     /// <summary>
-    /// µØÃæ¼ì²â
+    /// åœ°é¢æ£€æµ‹
     /// </summary>
     /// <returns></returns>
     public bool OnLandCheck()
     {
-        bool isOnLand = false;
         RaycastHit leftHit;
         RaycastHit rightHit;
-        isOnLand =  Physics.Raycast(LeftFoot.position, Vector3.down, out leftHit, 1.0f, LayerMask);
-        isOnLand |= Physics.Raycast(RightFoot.position, Vector3.down, out rightHit, 1.0f, LayerMask);
-        return isOnLand;
+        Vector3 leftRayOrigin = LeftFoot.position + Vector3.up * LandCheckBias;
+        Vector3 rightRayOrigin = RightFoot.position + Vector3.up * LandCheckBias;
+        bool leftGrounded = Physics.Raycast(leftRayOrigin, Vector3.down, out leftHit, GroundCheckRayLength, LayerMask);
+        bool rightGrounded = Physics.Raycast(rightRayOrigin, Vector3.down, out rightHit, GroundCheckRayLength, LayerMask);
+
+        if (DrawDebugRays)
+        {
+            Debug.DrawRay(leftRayOrigin, Vector3.down * GroundCheckRayLength, leftGrounded ? Color.green : Color.red);
+            Debug.DrawRay(rightRayOrigin, Vector3.down * GroundCheckRayLength, rightGrounded ? Color.green : Color.red);
+        }
+
+        return leftGrounded || rightGrounded;
     }
 }

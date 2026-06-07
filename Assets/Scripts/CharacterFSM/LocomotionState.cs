@@ -1,438 +1,206 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 
 namespace CFSM
 {
-    enum LocomotionType
+    /// <summary>
+    /// 默认移动状态。负责 Idle、Walk、Run、Sprint 的子行为，不再把它们拆成主状态。
+    /// </summary>
+    public class LocomotionState : CharacterStateBase
     {
-        Idle,
-        Walk,
-        Run,
-        Sprint,
-    }
+        /// <summary>状态机引用，用于读取 Inspector 中配置的动画名并播放动画。</summary>
+        private readonly CharacterFSM machine;
 
-    public class LocomotionState : BaseState, IStateMachine
-    {
-        public BlackBoard bb;
-        public Animator animator;
-        public Rigidbody playerRigidbody;
-        public Transform playerTransform;
-        public Camera mainCamera;
-        public InputHandler inputHandler;
-        public PlayerManager playerManager;
+        /// <summary>上一次播放的移动模式，用于避免每帧重复 CrossFade。</summary>
+        private MoveMode lastMoveMode = MoveMode.Idle;
 
-        Dictionary<int, BaseState> LocomotionStateDir; //�ƶ���״̬��
-        int currentStateIndex;
-
-        public LocomotionState(CharacterFSM fsm) : base(fsm) 
+        public LocomotionState(CharacterFSM machine)
         {
-            bb = fsm.bb;
-            animator = fsm.animator;
-            playerRigidbody = fsm.playerBody;
-            playerTransform = fsm.playerTransform;
-            mainCamera = fsm.mainCamera;
-            inputHandler = fsm.inputHandler;
-            playerManager = fsm.playerManager;
-            LocomotionStateDir = new Dictionary<int, BaseState>();
-            LocomotionStateDir.Add((int)LocomotionType.Idle, new Idle(this));
-            LocomotionStateDir.Add((int)LocomotionType.Walk, new Walk(this));
-            LocomotionStateDir.Add((int)LocomotionType.Run, new Run(this));
-            LocomotionStateDir.Add((int)LocomotionType.Sprint, new Sprint(this));
-            currentStateIndex = 0;
-
-        }
-        public override void Enter()
-        {
-            Debug.Log("Locomotion...");
-            animator.CrossFade("StrafeCommonLocomotion", 0.2f);
-            SwitchState(currentStateIndex);
+            this.machine = machine;
         }
 
-        public override void Exit()
+        /// <summary>当前状态类型。</summary>
+        public override CharacterStateType StateType => CharacterStateType.Locomotion;
+
+        /// <summary>移动状态优先级最低，通常作为默认回退状态。</summary>
+        public override int Priority => StatePriorities.Locomotion;
+
+        /// <summary>
+        /// Locomotion 可以被主要动作请求打断，包括跳跃、攻击、防御、闪避和受击。
+        /// </summary>
+        public override bool CanInterruptBy(StateContext ctx, StateRequest request)
         {
-            LocomotionStateDir[currentStateIndex].Exit();   
-            currentStateIndex = 0;
+            return request.force
+                || request.type == StateRequestType.Jump
+                || request.type == StateRequestType.Attack
+                || request.type == StateRequestType.Guard
+                || request.type == StateRequestType.Dodge
+                || request.type == StateRequestType.Hit;
         }
 
-        public override void FixedUpdate()
+        /// <summary>
+        /// 进入移动状态时关闭 root motion，并切换到移动 BlendTree/动画。
+        /// </summary>
+        public override void Enter(StateContext ctx, StateRequest request)
         {
-            StateFixedUpdate();
+            if (ctx.animator != null)
+                ctx.animator.applyRootMotion = false;
+
+            lastMoveMode = MoveMode.Idle;
+            UpdateLocomotionAnimation(ctx, true);
         }
 
-        public override void Update()
+        /// <summary>
+        /// 当前移动状态没有额外退出清理。
+        /// </summary>
+        public override void Exit(StateContext ctx)
         {
-            if (Listen()) return;
-            StateUpdate();
-            //if (playerManager.canRotate)
-            //{
-            //    float vertical = inputHandler.vertical;
-            //    float horizontal = inputHandler.horizontal;
-            //    Vector3 forward = mainCamera.transform.forward;
-            //    Vector3 right = mainCamera.transform.right;
-            //    Vector3 lookDir = forward * vertical + right * horizontal;
-            //    lookDir.Normalize();
-            //    Turn(lookDir);
-            //}
         }
 
-        public void StateUpdate()
+        /// <summary>
+        /// 更新 Animator 移动参数，把相机相对输入转换为角色本地方向上的 Vertical/Horizontal。
+        /// </summary>
+        public override void Tick(StateContext ctx)
         {
-            LocomotionStateDir[currentStateIndex].Update();
-        }
-
-        public void StateFixedUpdate()
-        {
-            LocomotionStateDir[currentStateIndex].FixedUpdate();
-        }
-
-        public void SwitchState(int id)
-        {
-            if (!LocomotionStateDir.ContainsKey(id))
+            if (ctx.animator == null || ctx.playerTransform == null)
                 return;
-            LocomotionStateDir[currentStateIndex].Exit();
-            currentStateIndex = id;
-            LocomotionStateDir[currentStateIndex].Enter();
+
+            UpdateLocomotionAnimation(ctx, false);
+
+            Vector2 locomotionDir = GetCameraRelativeInput(ctx);
+            Vector2 modelForward = new Vector2(ctx.playerTransform.forward.x, ctx.playerTransform.forward.z).normalized;
+
+            float speedScale = GetAnimatorSpeedScale(ctx);
+            Utils.PlayerLocomotion.HandleAnimatorInputByLocomotionInput(
+                modelForward,
+                locomotionDir * speedScale,
+                out float vertical,
+                out float horizontal);
+
+            vertical = Mathf.Clamp(vertical, -speedScale, speedScale);
+            horizontal = Mathf.Clamp(horizontal, -speedScale, speedScale);
+
+            ctx.animator.SetFloat("Vertical", Mathf.Lerp(ctx.animator.GetFloat("Vertical"), vertical, Time.deltaTime * 10f));
+            ctx.animator.SetFloat("Horizontal", Mathf.Lerp(ctx.animator.GetFloat("Horizontal"), horizontal, Time.deltaTime * 10f));
         }
 
-        public void MakeTransition(int id, int priority, Func<bool> listen, Action transAction)
+        /// <summary>
+        /// 执行刚体移动和角色朝向旋转。无输入时清掉水平速度，避免角色继续滑动。
+        /// </summary>
+        public override void FixedTick(StateContext ctx)
         {
-            if(LocomotionStateDir.ContainsKey(id))
-                LocomotionStateDir[id].AddListen(priority, listen, transAction);
-        }
+            if (ctx.playerManager == null)
+                return;
 
-        public void Turn(Vector3 lookDir)
-        {
-            float angle = Utils.PlayerLocomotion.GetPlayerRotationAngle(lookDir, playerTransform.forward, Vector3.up);
-            animator.SetFloat("TurnAngle", angle);
-            Debug.Log($"ת��{angle}");
-            animator.CrossFade("Turning", 0.2f, 1);
-        }
-
-        public void SetListenShield(int shield)
-        {
-            ListenShield = shield;
-        }
-    }
-
-    public class Idle : BaseState
-    {
-        Animator animator;
-        public Idle(LocomotionState fsm) : base(fsm)
-        {
-            animator = fsm.animator;
-        }
-        public override void Enter()
-        {
-            if (Listen()) return;
-            Debug.Log("Idling...");
-            animator.CrossFade("StrafeCommonLocomotion", 0.5f);
-        }
-
-        public override void Exit()
-        {
-        }
-
-        public override void FixedUpdate()
-        {
-        }
-
-        public override void Update()
-        {
-            if (Listen()) return;
-            animator.SetFloat("Vertical", Mathf.Lerp(animator.GetFloat("Vertical"), 0f, Time.deltaTime * 10f));
-            animator.SetFloat("Horizontal", Mathf.Lerp(animator.GetFloat("Horizontal"), 0f, Time.deltaTime * 10f));
-        }
-    }
-
-    public class Walk : BaseState
-    {
-        InputHandler inputHandler;
-        Animator animator;
-        Transform playerTransform;
-        Transform mainCamera;
-        PlayerManager playerManager;
-
-        public Walk(LocomotionState fsm) : base(fsm)
-        {
-            animator = fsm.animator;
-            inputHandler = fsm.inputHandler;
-            playerTransform = fsm.playerTransform;
-            mainCamera = fsm.mainCamera.transform;
-            playerManager = fsm.playerManager;
-
-            //Walk -> Idle
-            AddListen(10, ()=>inputHandler.Movement <= 0.2f, () => { fsm.SwitchState((int)LocomotionType.Idle); }); //״̬ת����Idle
-            //Idle -> Walk
-            fsm.MakeTransition(
-                (int)LocomotionType.Idle, 
-                5,
-                ()=>inputHandler.Movement > 0.2f && inputHandler.Movement < 0.55f,
-                () => { fsm.SwitchState((int)LocomotionType.Walk); }
-                );
-        }
-        public override void Enter()
-        {
-            Debug.Log("Walking...");
-            animator.CrossFade("StrafeCommonLocomotion", 0.2f);
-        }
-
-        public override void Exit()
-        {
-        }
-
-        public override void FixedUpdate()
-        {
-            float vertical = inputHandler.vertical; 
-            float horizontal = inputHandler.horizontal;
-            Vector3 forward = mainCamera.forward;
-            Vector3 right = mainCamera.right;
-            Vector3 moveDir = forward * vertical + right * horizontal;
-            moveDir.Normalize();
-            if (playerManager.canRotate)
+            if (ctx.movementAmount <= 0.05f)
             {
-                playerManager.LookRotate(moveDir, Vector3.up);
-            }
-            playerManager.Move(moveDir, playerManager.WalkSpeed, Vector3.up);
-        }
-
-        public override void Update()
-        {
-            if (Listen()) return;
-            float vertical = inputHandler.vertical; // Get vertical input from InputHandler
-            float horizontal = inputHandler.horizontal; // Get horizontal input from InputHandler
-            Vector2 modelForward = new Vector2(playerTransform.forward.x, playerTransform.forward.z); // Get the player's forward direction
-            Vector2 forward = new Vector2(mainCamera.forward.x, mainCamera.forward.z);
-            Vector2 right = new Vector2(mainCamera.right.x, mainCamera.right.z);
-            forward.Normalize();
-            right.Normalize();
-            Vector2 locomotionDir = forward * vertical + right * horizontal;
-            locomotionDir.Normalize();
-            Utils.PlayerLocomotion.HandleAnimatorInputByLocomotionInput(modelForward, locomotionDir, out vertical, out horizontal); // Handle animator input based on locomotion input
-            vertical = Mathf.Clamp(vertical, -1f, 1f);
-            horizontal = Mathf.Clamp(horizontal, -1f, 1f);
-            animator.SetFloat("Vertical", Mathf.Lerp(animator.GetFloat("Vertical"), vertical, Time.deltaTime * 10f));
-            animator.SetFloat("Horizontal", Mathf.Lerp(animator.GetFloat("Horizontal"), horizontal, Time.deltaTime * 10f));
-        }
-    }
-
-    public class Run : BaseState
-    {
-        InputHandler inputHandler;
-        Animator animator;
-        Transform playerTransform;
-        Transform mainCamera;
-        PlayerManager playerManager;
-
-        public Run(LocomotionState fsm) : base(fsm)
-        {
-            animator = fsm.animator;
-            inputHandler = fsm.inputHandler;
-            playerTransform = fsm.playerTransform;
-            mainCamera = Camera.main.transform;
-            playerManager = fsm.playerManager;
-
-            //Run -> Idle
-            AddListen(10, () => inputHandler.Movement <= 0.2f, () => { fsm.SwitchState((int)LocomotionType.Idle); }); //״̬ת����Idle
-            //Idle -> Run
-            fsm.MakeTransition(
-                (int)LocomotionType.Idle,
-                5,
-                () => inputHandler.Movement > 0.55f,
-                () => { fsm.SwitchState((int)LocomotionType.Run); }
-                );
-            //Walk -> Run
-            fsm.MakeTransition(
-                (int)LocomotionType.Walk,
-                5,
-                () => inputHandler.Movement > 0.55f,
-                () => { fsm.SwitchState((int)LocomotionType.Run); });
-            //Run->Walk
-            AddListen(10, ()=> inputHandler.Movement <= 0.55f, () => { fsm.SwitchState((int)LocomotionType.Walk); });
-        }
-
-        public override void Enter()
-        {
-            Debug.Log("Running...");
-            animator.CrossFade("StrafeCommonLocomotion", 0.2f);
-        }
-
-        public override void Exit()
-        {
-        }
-
-        public override void FixedUpdate()
-        {
-            float vertical = inputHandler.vertical;
-            float horizontal = inputHandler.horizontal;
-            Vector3 forward = mainCamera.forward;
-            Vector3 right = mainCamera.right;
-            Vector3 moveDir = forward * vertical + right * horizontal;
-            moveDir.Normalize();
-            if (playerManager.canRotate)
-            {
-                playerManager.LookRotate(moveDir, Vector3.up);
-            }
-            playerManager.Move(moveDir, playerManager.RunSpeed, Vector3.up);
-        }
-
-        public override void Update()
-        {
-            if (Listen()) return;
-            float vertical = inputHandler.vertical; // Get vertical input from InputHandler
-            float horizontal = inputHandler.horizontal; // Get horizontal input from InputHandler
-            Vector2 modelForward = new Vector2(playerTransform.forward.x, playerTransform.forward.z); // Get the player's forward direction
-            Vector2 forward = new Vector2(mainCamera.forward.x, mainCamera.forward.z);
-            Vector2 right = new Vector2(mainCamera.right.x, mainCamera.right.z);
-            forward.Normalize();
-            right.Normalize();
-            Vector2 locomotionDir = forward * vertical + right * horizontal;
-            locomotionDir.Normalize();
-            locomotionDir *= 2;
-            Utils.PlayerLocomotion.HandleAnimatorInputByLocomotionInput(modelForward, locomotionDir, out vertical, out horizontal); // Handle animator input based on locomotion input
-            vertical = Mathf.Clamp(vertical, -2f, 2f);
-            horizontal = Mathf.Clamp(horizontal, -2f, 2f);
-            animator.SetFloat("Vertical", Mathf.Lerp(animator.GetFloat("Vertical"), vertical, Time.deltaTime * 10f));
-            animator.SetFloat("Horizontal", Mathf.Lerp(animator.GetFloat("Horizontal"), horizontal, Time.deltaTime * 10f));
-        }
-    }
-
-    public class Sprint : BaseState
-    {
-        Transform mainCamera;
-        PlayerManager playerManager;
-        Rigidbody playerRigidbody;
-        Animator animator;
-        InputHandler inputHandler;
-        Transform playerTransform;
-
-        int updateState = 0; //0�� 1��ѭ��ģʽ�� 2��ɲ��ģʽ, 3:����ģʽ
-        public Sprint(LocomotionState fsm) : base(fsm)
-        {
-            mainCamera = fsm.mainCamera.transform;
-            playerManager = fsm.playerManager;
-            playerRigidbody = fsm.playerRigidbody;
-            animator = fsm.animator;
-            inputHandler = fsm.inputHandler;
-            playerTransform = fsm.playerTransform;
-
-            //Idle -> Sprint
-            fsm.MakeTransition(
-                (int)LocomotionType.Idle,
-                10,
-                ()=> inputHandler.B_Input && inputHandler.B_Input_Time > 0.5f && inputHandler.Movement > 0.55f,
-                ()=> { fsm.SwitchState((int)LocomotionType.Sprint); }
-                );
-            //Walk -> Sprint
-            fsm.MakeTransition(
-                (int)LocomotionType.Walk,
-                10,
-                () => inputHandler.B_Input && inputHandler.B_Input_Time > 0.5f && inputHandler.Movement > 0.55f,
-                () => { fsm.SwitchState((int)LocomotionType.Sprint); }
-                );
-            //Run -> Sprint
-            fsm.MakeTransition(
-                (int)LocomotionType.Run,
-                5,
-                () => inputHandler.B_Input && inputHandler.B_Input_Time > 0.5f && inputHandler.Movement > 0.55f,
-                () => { fsm.SwitchState((int)LocomotionType.Sprint); }
-                );
-            //ɲ������
-            AddListen(15, () => {
-                if (updateState != 1)
-                    return false;
-                if (!inputHandler.B_Input || inputHandler.Movement < 0.55f)
-                {
-                    return true;
-                }
-                    
-                Quaternion rotation = Utils.PlayerLocomotion.GetPlayerRotation(mainCamera, inputHandler.vertical, inputHandler.horizontal, playerTransform.forward);
-                Vector3 forward = playerTransform.forward;
-                Vector3 lookDir = rotation * forward;
-                forward.y = 0;
-                forward.Normalize();
-                float angle = Vector3.SignedAngle(forward, lookDir, Vector3.up);
-                //if (Mathf.Abs(angle) > 90f)
-                //{
-                //    Debug.Log($"ֱ��ת��");
-                //    return true;
-                //}
-                    
-                return false;
-                }, 
-                () => { 
-                    updateState = 2;
-                    Debug.Log("��ʼɲ��");
-                    animator.CrossFade("SprintEnd", 0.2f);
-                    
-                }//��ģʽ����Ϊɲ��ģʽ
-                );
-            //�����Ƿ�ɲ����ֹ����ֹǰֹͣ��Ӧ16�����µ�״̬ת��
-            AddListen(16,
-                () =>
-                {
-                    if (updateState != 2)
-                        return false;
-                    AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0); //ɲ��ִ��80%����뻺��ģʽ����ʼ��Ӧ����
-                    if (info.IsName("SprintEnd") && info.normalizedTime > 0.8f) { updateState = 3; }
-                    return updateState == 2;
-                },
-                () => { }
-                ); 
-            //Sprint -> Idle
-            AddListen(10, () => inputHandler.Movement < 0.2f && updateState == 3, () => { fsm.SwitchState((int)LocomotionType.Idle); });
-            //Sprint -> Walk
-            AddListen(10, () => inputHandler.Movement > 0.2f && inputHandler.Movement < 0.55f, () => { fsm.SwitchState((int)LocomotionType.Walk); });
-            //Sprint -> Run
-            AddListen(10, () => inputHandler.Movement > 0.55f && !inputHandler.B_Input, () => { fsm.SwitchState((int)LocomotionType.Run); });
-
-        }
-
-        public override void Enter()
-        {
-            Debug.Log("Sprinting...");
-            updateState = 1;
-            animator.CrossFade("StrafeSprinting", 0.2f);
-        }
-
-        public override void Exit()
-        {
-            updateState = 0;
-        }
-
-        public override void FixedUpdate()
-        {
-            if(updateState != 1)
-            {
-                Debug.Log($"����ͣ�£��ٶȣ�{playerRigidbody.velocity.magnitude}");
+                StopHorizontalVelocity(ctx);
                 return;
             }
-            float vertical = inputHandler.vertical;
-            float horizontal = inputHandler.horizontal;
-            Vector3 forward = mainCamera.forward;
-            Vector3 right = mainCamera.right;
-            Vector3 moveDir = forward * vertical + right * horizontal;
-            moveDir.Normalize();
-            if (playerManager.canRotate)
-            {
-                playerManager.LookRotate(moveDir, Vector3.up);
-            }
-            playerManager.Move(moveDir, playerManager.SprintSpeed, Vector3.up);
+
+            Vector3 moveDir = GetCameraRelativeMoveDirection(ctx);
+            if (moveDir.sqrMagnitude <= 0.0001f)
+                return;
+
+            if (ctx.playerManager.canRotate)
+                ctx.playerManager.LookRotate(moveDir, Vector3.up);
+
+            ctx.playerManager.Move(moveDir, GetMoveSpeed(ctx), Vector3.up);
         }
 
-        public override void Update()
+        /// <summary>
+        /// 保留垂直速度，只清除水平速度。用于无移动输入时停止角色平面移动。
+        /// </summary>
+        private static void StopHorizontalVelocity(StateContext ctx)
         {
-            if (Listen()) return;
-            if (updateState == 3 && inputHandler.B_Input && inputHandler.B_Input_Time > 0.5f)
+            if (ctx.playerBody == null)
+                return;
+
+            Vector3 velocity = ctx.playerBody.velocity;
+            ctx.playerBody.velocity = new Vector3(0f, velocity.y, 0f);
+        }
+
+        /// <summary>
+        /// 根据输入强度和疾跑键计算 Animator 参数缩放值。
+        /// </summary>
+        private static float GetAnimatorSpeedScale(StateContext ctx)
+        {
+            switch (ctx.moveMode)
             {
-                updateState = 1;
-                animator.CrossFade("StrafeSprinting", 1f);
+                case MoveMode.Sprint:
+                case MoveMode.Run:
+                    return 2f;
+                case MoveMode.Walk:
+                    return 1f;
+                default:
+                    return 0f;
             }
         }
 
+        /// <summary>
+        /// 根据当前移动模式切换 Locomotion/Sprinting 动画。Walk 和 Run 共用移动 BlendTree。
+        /// </summary>
+        private void UpdateLocomotionAnimation(StateContext ctx, bool force)
+        {
+            MoveMode targetMode = ctx.moveMode == MoveMode.Sprint ? MoveMode.Sprint : MoveMode.Run;
+            if (!force && targetMode == lastMoveMode)
+                return;
+
+            lastMoveMode = targetMode;
+
+            if (targetMode == MoveMode.Sprint)
+                machine.CrossFade(machine.sprintAnimation, 0.15f);
+            else
+                machine.CrossFade(machine.locomotionAnimation, 0.2f);
+        }
+
+        /// <summary>
+        /// 根据输入强度和疾跑键选择实际移动速度。
+        /// </summary>
+        private static float GetMoveSpeed(StateContext ctx)
+        {
+            switch (ctx.moveMode)
+            {
+                case MoveMode.Sprint:
+                    return ctx.playerManager.SprintSpeed;
+                case MoveMode.Run:
+                    return ctx.playerManager.RunSpeed;
+                case MoveMode.Walk:
+                    return ctx.playerManager.WalkSpeed;
+                default:
+                    return 0f;
+            }
+        }
+
+        /// <summary>
+        /// 获取相机相对输入方向，用于 Animator 参数计算。
+        /// </summary>
+        private static Vector2 GetCameraRelativeInput(StateContext ctx)
+        {
+            if (ctx.mainCamera == null)
+                return ctx.moveInput.normalized;
+
+            Vector3 moveDir = GetCameraRelativeMoveDirection(ctx);
+            return new Vector2(moveDir.x, moveDir.z);
+        }
+
+        /// <summary>
+        /// 将输入轴转换为世界空间中的相机相对移动方向。
+        /// </summary>
+        private static Vector3 GetCameraRelativeMoveDirection(StateContext ctx)
+        {
+            Vector3 forward = ctx.mainCamera != null ? ctx.mainCamera.transform.forward : ctx.playerTransform.forward;
+            Vector3 right = ctx.mainCamera != null ? ctx.mainCamera.transform.right : ctx.playerTransform.right;
+
+            forward.y = 0f;
+            right.y = 0f;
+            forward.Normalize();
+            right.Normalize();
+
+            Vector3 moveDir = forward * ctx.moveInput.y + right * ctx.moveInput.x;
+            if (moveDir.sqrMagnitude > 1f)
+                moveDir.Normalize();
+
+            return moveDir;
+        }
     }
 }
-
-
