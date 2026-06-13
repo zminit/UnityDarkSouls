@@ -491,4 +491,174 @@ namespace CFSM
         {
         }
     }
+
+    public abstract class WeaponActionStateBase : CharacterStateBase
+    {
+        private readonly CharacterFSM machine;
+        private readonly CharacterStateType stateType;
+        private readonly StateRequestType requestType;
+        private float enteredAt;
+        private bool completed;
+
+        protected WeaponActionStateBase(
+            CharacterFSM machine,
+            CharacterStateType stateType,
+            StateRequestType requestType)
+        {
+            this.machine = machine;
+            this.stateType = stateType;
+            this.requestType = requestType;
+        }
+
+        public override CharacterStateType StateType => stateType;
+        public override int Priority => StatePriorities.WeaponAction;
+        public override bool IsInterruptible => false;
+
+        protected abstract string AnimationName { get; }
+        protected abstract float CrossFadeDuration(PlayerManager playerManager);
+        protected abstract float FallbackDuration { get; }
+        protected abstract bool CanStart(PlayerManager playerManager);
+        protected abstract void Begin(PlayerManager playerManager);
+        protected abstract void Complete(PlayerManager playerManager);
+
+        public override bool CanEnter(StateContext ctx, StateRequest request)
+        {
+            return request.type == requestType
+                && ctx.playerManager != null
+                && CanStart(ctx.playerManager);
+        }
+
+        public override bool CanInterruptBy(StateContext ctx, StateRequest request)
+        {
+            if (request.force || request.type == StateRequestType.Hit)
+                return true;
+
+            if (request.type == StateRequestType.Move && ctx.movementAmount > 0.05f)
+                return true;
+
+            return request.type == StateRequestType.Attack
+                || request.type == StateRequestType.Jump
+                || request.type == StateRequestType.Dodge;
+        }
+
+        public override void Enter(StateContext ctx, StateRequest request)
+        {
+            enteredAt = Time.time;
+            completed = false;
+
+            if (ctx.animator != null)
+                ctx.animator.applyRootMotion = true;
+
+            Begin(ctx.playerManager);
+            machine.CrossFade(AnimationName, CrossFadeDuration(ctx.playerManager));
+        }
+
+        public override void Exit(StateContext ctx)
+        {
+            if (!completed)
+                ctx.playerManager?.CancelWeaponAction();
+        }
+
+        public override void Tick(StateContext ctx)
+        {
+            if (HasAnimationFinished(ctx) || Time.time - enteredAt >= FallbackDuration)
+                Finish(ctx);
+        }
+
+        public override void FixedTick(StateContext ctx)
+        {
+        }
+
+        private void Finish(StateContext ctx)
+        {
+            if (completed)
+                return;
+
+            completed = true;
+            Complete(ctx.playerManager);
+            ctx.SubmitRequest(StateRequest.Create(
+                StateRequestType.AnimationEnd,
+                CharacterStateType.Locomotion,
+                StatePriorities.Locomotion,
+                RequestSource.State,
+                force: true));
+        }
+
+        private bool HasAnimationFinished(StateContext ctx)
+        {
+            if (ctx.animator == null || string.IsNullOrEmpty(AnimationName))
+                return false;
+
+            AnimatorStateInfo info = ctx.animator.GetCurrentAnimatorStateInfo(0);
+            return info.IsName(AnimationName) && info.normalizedTime >= 0.99f;
+        }
+    }
+
+    public class DrawWeaponState : WeaponActionStateBase
+    {
+        private readonly CharacterFSM machine;
+
+        public DrawWeaponState(CharacterFSM machine)
+            : base(machine, CharacterStateType.DrawWeapon, StateRequestType.DrawWeapon)
+        {
+            this.machine = machine;
+        }
+
+        protected override string AnimationName => machine.drawWeaponAnimation;
+        protected override float FallbackDuration => machine.drawWeaponFallbackDuration;
+
+        protected override float CrossFadeDuration(PlayerManager playerManager)
+        {
+            return playerManager != null ? playerManager.DrawWeaponCrossFadeDuration : 0.1f;
+        }
+
+        protected override bool CanStart(PlayerManager playerManager)
+        {
+            return playerManager != null && !playerManager.IsArmed && !playerManager.IsChangingWeaponState;
+        }
+
+        protected override void Begin(PlayerManager playerManager)
+        {
+            playerManager?.BeginDrawWeaponAction();
+        }
+
+        protected override void Complete(PlayerManager playerManager)
+        {
+            playerManager?.CancelWeaponAction();
+        }
+    }
+
+    public class SheatheWeaponState : WeaponActionStateBase
+    {
+        private readonly CharacterFSM machine;
+
+        public SheatheWeaponState(CharacterFSM machine)
+            : base(machine, CharacterStateType.SheatheWeapon, StateRequestType.SheatheWeapon)
+        {
+            this.machine = machine;
+        }
+
+        protected override string AnimationName => machine.sheatheWeaponAnimation;
+        protected override float FallbackDuration => machine.sheatheWeaponFallbackDuration;
+
+        protected override float CrossFadeDuration(PlayerManager playerManager)
+        {
+            return playerManager != null ? playerManager.SheatheWeaponCrossFadeDuration : 0.1f;
+        }
+
+        protected override bool CanStart(PlayerManager playerManager)
+        {
+            return playerManager != null && playerManager.IsArmed && !playerManager.IsChangingWeaponState;
+        }
+
+        protected override void Begin(PlayerManager playerManager)
+        {
+            playerManager?.BeginSheatheWeaponAction();
+        }
+
+        protected override void Complete(PlayerManager playerManager)
+        {
+            playerManager?.CancelWeaponAction();
+        }
+    }
 }

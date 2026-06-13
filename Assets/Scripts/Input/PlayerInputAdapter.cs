@@ -97,7 +97,14 @@ public class PlayerInputAdapter : MonoBehaviour, IStateRequestSource
         ctx.blackBoard.SetValue("MoveMode", moveMode);
 
         if (input.Sheathe.WasPressedThisFrame && ctx.playerManager != null)
-            ctx.playerManager.RequestToggleWeapon();
+        {
+            bool shouldSheathe = ctx.playerManager.IsArmed;
+            results.Add(StateRequest.Create(
+                shouldSheathe ? StateRequestType.SheatheWeapon : StateRequestType.DrawWeapon,
+                shouldSheathe ? CharacterStateType.SheatheWeapon : CharacterStateType.DrawWeapon,
+                StatePriorities.WeaponAction,
+                RequestSource.Input));
+        }
 
         results.Add(StateRequest.Create(
             StateRequestType.Move,

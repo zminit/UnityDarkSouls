@@ -38,6 +38,15 @@ namespace CFSM
         /// <summary>轻攻击动画状态名。</summary>
         public string lightAttackAnimation = "Attack_Light";
 
+        public string[] lightComboAnimations =
+        {
+            "Combo_01",
+            "Combo_02",
+            "Combo_03",
+            "Combo_04",
+            "Combo_05"
+        };
+
         /// <summary>重攻击动画状态名。</summary>
         public string heavyAttackAnimation = "Attack_Heavy";
 
@@ -55,6 +64,17 @@ namespace CFSM
 
         /// <summary>击飞/滞空受击动画状态名。</summary>
         public string airborneAnimation = "Jumping";
+
+        [Header("Weapon Action Animation Names")]
+        public string drawWeaponAnimation = "DrawSword";
+        public string sheatheWeaponAnimation = "SheatheSword";
+
+        [Header("Action Timing")]
+        public float lightComboFallbackDuration = 3.0f;
+        public float heavyAttackFallbackDuration = 3.0f;
+        public float airAttackFallbackDuration = 2.5f;
+        public float drawWeaponFallbackDuration = 3.0f;
+        public float sheatheWeaponFallbackDuration = 3.0f;
 
         [Header("Dodge Settings")]
         /// <summary>闪避物理位移速度。当前 DodgeState 默认使用刚体位移，不依赖 root motion。</summary>
@@ -87,6 +107,8 @@ namespace CFSM
 
         /// <summary>当前主状态类型，对外只读。</summary>
         public CharacterStateType CurrentStateType => currentStateType;
+
+        public MoveMode CurrentMoveMode => ctx != null ? ctx.moveMode : MoveMode.Idle;
 
         /// <summary>
         /// 初始化状态上下文、注册状态和默认请求源。
@@ -172,6 +194,14 @@ namespace CFSM
             SubmitRequest(StateRequest.Create(requestType, targetState, priority, source, payload, force));
         }
 
+        public void NotifyAnimationEvent(CharacterAnimationEventType eventType)
+        {
+            if (currentState == null || ctx == null)
+                return;
+
+            currentState.HandleAnimationEvent(ctx, eventType);
+        }
+
         /// <summary>
         /// 注册一个请求源。重复注册同一实例会被忽略。
         /// </summary>
@@ -225,6 +255,8 @@ namespace CFSM
             states[CharacterStateType.Locomotion] = new LocomotionState(this);
             states[CharacterStateType.Jump] = new JumpState(this);
             states[CharacterStateType.Attack] = new AttackState(this);
+            states[CharacterStateType.DrawWeapon] = new DrawWeaponState(this);
+            states[CharacterStateType.SheatheWeapon] = new SheatheWeaponState(this);
             states[CharacterStateType.Guard] = new GuardState(this);
             states[CharacterStateType.Dodge] = new DodgeState(this);
             states[CharacterStateType.Hit] = new HitState(this);
@@ -293,7 +325,7 @@ namespace CFSM
                 return false;
 
             if (currentState != null && request.targetState == currentStateType)
-                return false;
+                return currentState.TryHandleRequest(ctx, request);
 
             if (currentState != null && !request.force && !currentState.CanInterruptBy(ctx, request))
                 return false;

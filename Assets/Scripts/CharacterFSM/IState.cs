@@ -12,6 +12,8 @@ namespace CFSM
         Locomotion,
         Jump,
         Attack,
+        DrawWeapon,
+        SheatheWeapon,
         Guard,
         Dodge,
         Hit,
@@ -26,6 +28,8 @@ namespace CFSM
         Move,
         Jump,
         Attack,
+        DrawWeapon,
+        SheatheWeapon,
         Guard,
         Dodge,
         Hit,
@@ -66,6 +70,16 @@ namespace CFSM
         Sprint
     }
 
+    public enum CharacterAnimationEventType
+    {
+        OpenComboWindow,
+        CloseComboWindow,
+        TryConsumeCombo,
+        AttackEnd,
+        OpenCancelWindow,
+        CloseCancelWindow
+    }
+
     /// <summary>
     /// 默认状态优先级。数值越高，同一帧内越先尝试处理。
     /// </summary>
@@ -74,6 +88,7 @@ namespace CFSM
         public const int Locomotion = 10;
         public const int Jump = 50;
         public const int Attack = 60;
+        public const int WeaponAction = 20;
         public const int Guard = 70;
         public const int Dodge = 80;
         public const int Airborne = 90;
@@ -316,6 +331,18 @@ namespace CFSM
         public virtual bool CanInterruptBy(StateContext ctx, StateRequest request)
         {
             return request.force || (IsInterruptible && request.priority >= Priority);
+        }
+
+        /// <summary>
+        /// 当前状态接收目标仍是自己的请求。用于攻击连段、蓄力、格挡持续等不需要重新 Enter 的内部输入。
+        /// </summary>
+        public virtual bool TryHandleRequest(StateContext ctx, StateRequest request)
+        {
+            return false;
+        }
+
+        public virtual void HandleAnimationEvent(StateContext ctx, CharacterAnimationEventType eventType)
+        {
         }
 
         /// <summary>进入状态时调用。</summary>

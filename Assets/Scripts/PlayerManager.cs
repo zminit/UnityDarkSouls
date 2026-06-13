@@ -9,7 +9,6 @@ public class PlayerManager : MonoBehaviour
     Rigidbody rb;
     Animator animator;
     CFSM.CharacterFSM characterFSM;
-
     public OnLandHandler OnLandHandler;
 
     #region Properties
@@ -29,27 +28,61 @@ public class PlayerManager : MonoBehaviour
     [SerializeField]
     float LandCheckBias;
 
-    [Header("Weapon Animation")]
+    [Header("Armed Animation")]
     [SerializeField]
-    bool isArmed = true;
+    bool isArmed;
     [SerializeField]
     string upperBodyLayerName = "Upper Body Layer";
     [SerializeField]
-    string drawAnimationName = "DrawSword";
-    [SerializeField]
-    string sheatheAnimationName = "SheatheSword";
-    [SerializeField]
     float upperBodyWeightBlendSpeed = 8f;
     [SerializeField]
-    float sheatheFallbackDuration = 1.0f;
+    int baseLayerIndex;
+    [SerializeField]
+    string baseLocomotionStateName = "CommonLocomotion";
 
+    [Header("Draw Weapon Animation")]
+    [SerializeField]
+    string armedUpperBodyAnimationName = "LocomotionWithWeapon";
+    [SerializeField]
+    string armsLayerName = "Arms";
+    [SerializeField]
+    string armedSprintAnimationName = "SprintWithWeapon";
+    [SerializeField]
+    float drawWeaponCrossFadeDuration = 0.1f;
+    [SerializeField]
+    float sheatheWeaponCrossFadeDuration = 0.1f;
+    [SerializeField]
+    float baseLocomotionCrossFadeDuration = 0.1f;
+    [SerializeField]
+    float armedUpperBodyCrossFadeDuration = 0.1f;
+    [SerializeField]
+    float armsLayerWeightBlendSpeed = 8f;
+    [SerializeField]
+    float armedSprintCrossFadeDuration = 0.1f;
     int upperBodyLayerIndex = -1;
+    int armsLayerIndex = -1;
     float upperBodyLayerWeight;
-    WeaponActionState weaponActionState = WeaponActionState.None;
-    float weaponActionStartedAt;
+    float armsLayerWeight;
+    bool isDrawingWeapon;
+    bool isSheathingWeapon;
+    bool wasUpperBodyLayerEnabled;
+    bool wasArmsLayerEnabled;
+
     #endregion
 
     public bool IsArmed => isArmed;
+    public bool IsDrawingWeapon => isDrawingWeapon;
+    public bool IsSheathingWeapon => isSheathingWeapon;
+    public bool IsChangingWeaponState => isDrawingWeapon || isSheathingWeapon;
+    public bool CanDrawWeapon => !isArmed
+        && !IsChangingWeaponState
+        && (characterFSM == null || characterFSM.CurrentStateType == CharacterStateType.Locomotion);
+    public bool CanSheatheWeapon => isArmed
+        && !IsChangingWeaponState
+        && (characterFSM == null || characterFSM.CurrentStateType == CharacterStateType.Locomotion);
+    public float DrawWeaponCrossFadeDuration => drawWeaponCrossFadeDuration;
+    public float SheatheWeaponCrossFadeDuration => sheatheWeaponCrossFadeDuration;
+    public float BaseLocomotionCrossFadeDuration => baseLocomotionCrossFadeDuration;
 
     private void Awake()
     {
@@ -58,16 +91,21 @@ public class PlayerManager : MonoBehaviour
         characterFSM = GetComponent<CFSM.CharacterFSM>();
         OnLandHandler = new OnLandHandler(LeftFoot, RightFoot);
         CacheUpperBodyLayer();
-        upperBodyLayerWeight = isArmed ? 1f : 0f;
+        CacheArmsLayer();
+        wasUpperBodyLayerEnabled = ShouldEnableUpperBodyLayer();
+        wasArmsLayerEnabled = ShouldEnableArmsLayer();
+        upperBodyLayerWeight = wasUpperBodyLayerEnabled ? 1f : 0f;
+        armsLayerWeight = wasArmsLayerEnabled ? 1f : 0f;
         ApplyUpperBodyLayerWeight();
+        ApplyArmsLayerWeight();
         SyncGroundRayDebugSettings();
     }
 
     private void Update()
     {
         SyncGroundRayDebugSettings();
-        TickWeaponAction();
         UpdateUpperBodyLayerWeight();
+        UpdateArmsLayerWeight();
     }
 
     private void OnValidate()
@@ -75,101 +113,107 @@ public class PlayerManager : MonoBehaviour
         SyncGroundRayDebugSettings();
     }
 
-    public bool RequestToggleWeapon()
-    {
-        if (!CanToggleWeapon())
-            return false;
-
-        if (isArmed)
-            return RequestSheatheWeapon();
-
-        return RequestDrawWeapon();
-    }
-
     public void SetArmed(bool armed)
     {
-        if (weaponActionState != WeaponActionState.None)
-            return;
-
         isArmed = armed;
     }
 
-    bool RequestSheatheWeapon()
+    public void ToggleArmed()
     {
-        if (!isArmed || weaponActionState != WeaponActionState.None)
-            return false;
-
-        if (!TryPlayWeaponAction(sheatheAnimationName))
-            return false;
-
-        weaponActionState = WeaponActionState.Sheathing;
-        weaponActionStartedAt = Time.time;
-        return true;
+        isArmed = !isArmed;
     }
 
-    bool RequestDrawWeapon()
-    {
-        if (isArmed || weaponActionState != WeaponActionState.None)
-            return false;
-
-        if (!TryPlayWeaponAction(drawAnimationName))
-            return false;
-
-        weaponActionState = WeaponActionState.Drawing;
-        weaponActionStartedAt = Time.time;
-        return true;
-    }
-
-    bool TryPlayWeaponAction(string animationName)
-    {
-        CacheUpperBodyLayer();
-        if (animator == null || upperBodyLayerIndex < 0 || string.IsNullOrEmpty(animationName))
-            return false;
-
-        int shortNameHash = Animator.StringToHash(animationName);
-        int fullPathHash = Animator.StringToHash($"{upperBodyLayerName}.{animationName}");
-        if (!animator.HasState(upperBodyLayerIndex, shortNameHash)
-            && !animator.HasState(upperBodyLayerIndex, fullPathHash))
-            return false;
-
-        animator.CrossFade(animationName, 0.1f, upperBodyLayerIndex);
-        return true;
-    }
-
-    bool CanToggleWeapon()
+    public bool RequestToggleWeapon()
     {
         if (characterFSM == null)
-            return true;
+            return false;
 
-        return characterFSM.CurrentStateType == CharacterStateType.Locomotion;
+        characterFSM.RequestState(
+            isArmed ? StateRequestType.SheatheWeapon : StateRequestType.DrawWeapon,
+            isArmed ? CharacterStateType.SheatheWeapon : CharacterStateType.DrawWeapon,
+            StatePriorities.WeaponAction,
+            RequestSource.Input);
+
+        return true;
     }
 
-    void TickWeaponAction()
+    public bool RequestDrawWeapon()
     {
-        if (weaponActionState == WeaponActionState.None)
+        if (characterFSM == null)
+            return false;
+
+        characterFSM.RequestState(
+            StateRequestType.DrawWeapon,
+            CharacterStateType.DrawWeapon,
+            StatePriorities.WeaponAction,
+            RequestSource.Input);
+
+        return true;
+    }
+
+    public bool RequestSheatheWeapon()
+    {
+        if (characterFSM == null)
+            return false;
+
+        characterFSM.RequestState(
+            StateRequestType.SheatheWeapon,
+            CharacterStateType.SheatheWeapon,
+            StatePriorities.WeaponAction,
+            RequestSource.Input);
+
+        return true;
+    }
+
+    public void BeginDrawWeaponAction()
+    {
+        isDrawingWeapon = true;
+        isSheathingWeapon = false;
+    }
+
+    public void BeginSheatheWeaponAction()
+    {
+        isSheathingWeapon = true;
+        isDrawingWeapon = false;
+    }
+
+    public void CancelWeaponAction()
+    {
+        isDrawingWeapon = false;
+        isSheathingWeapon = false;
+    }
+
+    public void CompleteDrawWeaponFromAnimationEvent()
+    {
+        if (!isDrawingWeapon)
             return;
 
-        if (weaponActionState == WeaponActionState.Sheathing && HasWeaponAnimationFinished(sheatheAnimationName))
-        {
-            isArmed = false;
-            weaponActionState = WeaponActionState.None;
-        }
-        else if (weaponActionState == WeaponActionState.Drawing && HasWeaponAnimationFinished(drawAnimationName))
-        {
-            isArmed = true;
-            weaponActionState = WeaponActionState.None;
-        }
+        isArmed = true;
+        isDrawingWeapon = false;
+        characterFSM?.RequestState(
+            StateRequestType.AnimationEnd,
+            CharacterStateType.Locomotion,
+            StatePriorities.Locomotion,
+            RequestSource.Animation,
+            force: true);
+
+        if (CanPlayArmedUpperBodyLocomotion())
+            CrossFadeUpperBodyState(armedUpperBodyAnimationName, armedUpperBodyCrossFadeDuration);
     }
 
-    bool HasWeaponAnimationFinished(string animationName)
+    public void CompleteSheatheWeaponFromAnimationEvent()
     {
-        if (animator == null || upperBodyLayerIndex < 0)
-            return Time.time - weaponActionStartedAt >= sheatheFallbackDuration;
+        if (!isSheathingWeapon)
+            return;
 
-        AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(upperBodyLayerIndex);
-        bool animationMatchedAndFinished = info.IsName(animationName) && info.normalizedTime >= 0.95f;
-        bool timedOut = Time.time - weaponActionStartedAt >= sheatheFallbackDuration;
-        return animationMatchedAndFinished || timedOut;
+        isArmed = false;
+        isSheathingWeapon = false;
+        characterFSM?.RequestState(
+            StateRequestType.AnimationEnd,
+            CharacterStateType.Locomotion,
+            StatePriorities.Locomotion,
+            RequestSource.Animation,
+            force: true);
     }
 
     void UpdateUpperBodyLayerWeight()
@@ -178,12 +222,17 @@ public class PlayerManager : MonoBehaviour
         if (animator == null || upperBodyLayerIndex < 0)
             return;
 
-        float targetWeight = weaponActionState != WeaponActionState.None || isArmed ? 1f : 0f;
+        bool shouldEnable = ShouldEnableUpperBodyLayer();
+        if (shouldEnable && !wasUpperBodyLayerEnabled && CanPlayArmedUpperBodyLocomotion())
+            CrossFadeUpperBodyState(armedUpperBodyAnimationName, armedUpperBodyCrossFadeDuration);
+
+        float targetWeight = shouldEnable ? 1f : 0f;
         upperBodyLayerWeight = Mathf.MoveTowards(
             upperBodyLayerWeight,
             targetWeight,
             upperBodyWeightBlendSpeed * Time.deltaTime);
         ApplyUpperBodyLayerWeight();
+        wasUpperBodyLayerEnabled = shouldEnable;
     }
 
     void ApplyUpperBodyLayerWeight()
@@ -200,6 +249,128 @@ public class PlayerManager : MonoBehaviour
         upperBodyLayerIndex = string.IsNullOrEmpty(upperBodyLayerName)
             ? -1
             : animator.GetLayerIndex(upperBodyLayerName);
+    }
+
+    void CacheArmsLayer()
+    {
+        if (animator == null)
+            return;
+
+        armsLayerIndex = string.IsNullOrEmpty(armsLayerName)
+            ? -1
+            : animator.GetLayerIndex(armsLayerName);
+    }
+
+    bool HasAnimatorState(int layerIndex, string stateName)
+    {
+        int shortNameHash = Animator.StringToHash(stateName);
+        string layerName = animator.GetLayerName(layerIndex);
+        int fullPathHash = Animator.StringToHash($"{layerName}.{stateName}");
+        return animator.HasState(layerIndex, shortNameHash)
+            || animator.HasState(layerIndex, fullPathHash);
+    }
+
+    bool ShouldEnableUpperBodyLayer()
+    {
+        return CanPlayArmedUpperBodyLocomotion();
+    }
+
+    bool ShouldEnableArmsLayer()
+    {
+        return CanPlayArmedSprint();
+    }
+
+    bool CanPlayArmedUpperBodyLocomotion()
+    {
+        return isArmed
+            && characterFSM != null
+            && characterFSM.CurrentStateType == CharacterStateType.Locomotion
+            && characterFSM.CurrentMoveMode != MoveMode.Sprint
+            && IsAnimatorInState(baseLayerIndex, baseLocomotionStateName);
+    }
+
+    bool CanPlayArmedSprint()
+    {
+        return isArmed
+            && characterFSM != null
+            && characterFSM.CurrentStateType == CharacterStateType.Locomotion
+            && characterFSM.CurrentMoveMode == MoveMode.Sprint;
+    }
+
+    bool IsAnimatorInState(int layerIndex, string stateName)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName) || layerIndex < 0)
+            return false;
+
+        AnimatorStateInfo current = animator.GetCurrentAnimatorStateInfo(layerIndex);
+        if (current.IsName(stateName))
+            return true;
+
+        if (!animator.IsInTransition(layerIndex))
+            return false;
+
+        AnimatorStateInfo next = animator.GetNextAnimatorStateInfo(layerIndex);
+        return next.IsName(stateName);
+    }
+
+    void CrossFadeUpperBodyState(string stateName, float duration)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName))
+            return;
+
+        CacheUpperBodyLayer();
+        if (upperBodyLayerIndex < 0 || !HasAnimatorState(upperBodyLayerIndex, stateName))
+            return;
+
+        animator.CrossFade(stateName, duration, upperBodyLayerIndex);
+    }
+
+    void UpdateArmsLayerWeight()
+    {
+        CacheArmsLayer();
+        if (animator == null || armsLayerIndex < 0)
+            return;
+
+        bool shouldEnable = ShouldEnableArmsLayer();
+        if (shouldEnable && !wasArmsLayerEnabled)
+            CrossFadeArmsState(armedSprintAnimationName, armedSprintCrossFadeDuration);
+
+        float targetWeight = shouldEnable ? 1f : 0f;
+        armsLayerWeight = Mathf.MoveTowards(
+            armsLayerWeight,
+            targetWeight,
+            armsLayerWeightBlendSpeed * Time.deltaTime);
+        ApplyArmsLayerWeight();
+        wasArmsLayerEnabled = shouldEnable;
+    }
+
+    void ApplyArmsLayerWeight()
+    {
+        if (animator != null && armsLayerIndex >= 0)
+            animator.SetLayerWeight(armsLayerIndex, armsLayerWeight);
+    }
+
+    void CrossFadeArmsState(string stateName, float duration)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName))
+            return;
+
+        CacheArmsLayer();
+        if (armsLayerIndex < 0 || !HasAnimatorState(armsLayerIndex, stateName))
+            return;
+
+        animator.CrossFade(stateName, duration, armsLayerIndex);
+    }
+
+    void CrossFadeBaseState(string stateName, float duration)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName))
+            return;
+
+        if (!HasAnimatorState(baseLayerIndex, stateName))
+            return;
+
+        animator.CrossFade(stateName, duration, baseLayerIndex);
     }
 
     private void OnDrawGizmosSelected()
@@ -230,13 +401,6 @@ public class PlayerManager : MonoBehaviour
         bool hitGround = Physics.Raycast(rayOrigin, Vector3.down, rayLength, 1);
         Gizmos.color = hitGround ? Color.green : Color.red;
         Gizmos.DrawLine(rayOrigin, rayOrigin + Vector3.down * rayLength);
-    }
-
-    enum WeaponActionState
-    {
-        None,
-        Drawing,
-        Sheathing
     }
 
     public void Move(Vector3 moveDir, float speed, Vector3 normal)

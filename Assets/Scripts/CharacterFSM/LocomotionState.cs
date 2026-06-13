@@ -40,6 +40,8 @@ namespace CFSM
             return request.force
                 || request.type == StateRequestType.Jump
                 || request.type == StateRequestType.Attack
+                || request.type == StateRequestType.DrawWeapon
+                || request.type == StateRequestType.SheatheWeapon
                 || request.type == StateRequestType.Guard
                 || request.type == StateRequestType.Dodge
                 || request.type == StateRequestType.Hit;
@@ -185,6 +187,9 @@ namespace CFSM
         /// </summary>
         private void UpdateLocomotionAnimation(StateContext ctx, bool force)
         {
+            if (ctx.playerManager != null && ctx.playerManager.IsChangingWeaponState)
+                return;
+
             MoveMode targetMode = ctx.moveMode == MoveMode.Sprint ? MoveMode.Sprint : MoveMode.Run;
             if (!force && targetMode == lastMoveMode)
                 return;

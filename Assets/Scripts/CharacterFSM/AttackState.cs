@@ -19,11 +19,18 @@ namespace CFSM
         /// <summary>当前攻击实际播放的动画状态名。</summary>
         private string currentAnimation;
 
+        private int comboIndex;
+        private bool isLightCombo;
+        private bool comboWindowOpen;
+        private bool bufferedLightAttack;
+        private bool comboConsumed;
+        private float fallbackDuration;
+
         /// <summary>进入攻击后至少等待该时长才打开取消窗口。</summary>
         private const float MinCancelTime = 0.35f;
 
         /// <summary>动画状态名未匹配或动画事件缺失时的兜底退出时间。</summary>
-        private const float FallbackDuration = 0.8f;
+        private const float NormalizedEndTime = 0.95f;
 
         public AttackState(CharacterFSM machine)
         {
@@ -60,7 +67,15 @@ namespace CFSM
         {
             enteredAt = Time.time;
             cancelWindow = false;
+            isLightCombo = IsLightAttack(request);
+            comboWindowOpen = false;
+            bufferedLightAttack = false;
+            comboConsumed = false;
+            comboIndex = 0;
             currentAnimation = ResolveAnimation(request);
+            fallbackDuration = ResolveFallbackDuration(request);
+
+            EnsureWeaponInHand(ctx);
 
             if (ctx.animator != null)
                 ctx.animator.applyRootMotion = true;
@@ -74,6 +89,48 @@ namespace CFSM
         public override void Exit(StateContext ctx)
         {
             cancelWindow = false;
+            comboWindowOpen = false;
+            bufferedLightAttack = false;
+            comboConsumed = false;
+        }
+
+        public override bool TryHandleRequest(StateContext ctx, StateRequest request)
+        {
+            if (!isLightCombo
+                || !comboWindowOpen
+                || !IsLightAttack(request)
+                || !CanChainToNextCombo())
+            {
+                return false;
+            }
+
+            bufferedLightAttack = true;
+            return true;
+        }
+
+        public override void HandleAnimationEvent(StateContext ctx, CharacterAnimationEventType eventType)
+        {
+            switch (eventType)
+            {
+                case CharacterAnimationEventType.OpenComboWindow:
+                    comboWindowOpen = true;
+                    break;
+                case CharacterAnimationEventType.CloseComboWindow:
+                    comboWindowOpen = false;
+                    break;
+                case CharacterAnimationEventType.TryConsumeCombo:
+                    TryConsumeCombo(ctx);
+                    break;
+                case CharacterAnimationEventType.AttackEnd:
+                    RequestLocomotion(ctx);
+                    break;
+                case CharacterAnimationEventType.OpenCancelWindow:
+                    cancelWindow = true;
+                    break;
+                case CharacterAnimationEventType.CloseCancelWindow:
+                    cancelWindow = false;
+                    break;
+            }
         }
 
         /// <summary>
@@ -85,15 +142,14 @@ namespace CFSM
             if (elapsed >= MinCancelTime)
                 cancelWindow = true;
 
-            if (HasAnimationFinished(ctx) || elapsed > FallbackDuration)
+            if (elapsed > fallbackDuration)
             {
-                ctx.SubmitRequest(StateRequest.Create(
-                    StateRequestType.AnimationEnd,
-                    CharacterStateType.Locomotion,
-                    StatePriorities.Locomotion,
-                    RequestSource.State,
-                    force: true));
+                RequestLocomotion(ctx);
+                return;
             }
+
+            if (!isLightCombo && HasAnimationFinished(ctx))
+                RequestLocomotion(ctx);
         }
 
         /// <summary>
@@ -117,7 +173,7 @@ namespace CFSM
                     return machine.heavyAttackAnimation;
             }
 
-            return machine.lightAttackAnimation;
+            return GetComboAnimation(0);
         }
 
         /// <summary>
@@ -129,7 +185,105 @@ namespace CFSM
                 return false;
 
             AnimatorStateInfo info = ctx.animator.GetCurrentAnimatorStateInfo(0);
-            return info.IsName(currentAnimation) && info.normalizedTime > 0.9f;
+            return info.IsName(currentAnimation) && info.normalizedTime >= NormalizedEndTime;
         }
+
+        private static void EnsureWeaponInHand(StateContext ctx)
+        {
+            if (ctx.playerManager == null || ctx.playerManager.IsArmed)
+                return;
+
+            WeaponAnimaEventReceiver receiver = ctx.playerManager.GetComponentInChildren<WeaponAnimaEventReceiver>();
+            if (receiver != null)
+                receiver.AttachToHand();
+
+            ctx.playerManager.SetArmed(true);
+        }
+
+        private void TryConsumeCombo(StateContext ctx)
+        {
+            if (comboConsumed)
+                return;
+
+            comboConsumed = true;
+
+            if (bufferedLightAttack && CanChainToNextCombo())
+                PlayNextCombo(ctx);
+        }
+
+        private void PlayNextCombo(StateContext ctx)
+        {
+            comboIndex++;
+            enteredAt = Time.time;
+            cancelWindow = false;
+            comboWindowOpen = false;
+            bufferedLightAttack = false;
+            comboConsumed = false;
+            currentAnimation = GetComboAnimation(comboIndex);
+            fallbackDuration = machine.lightComboFallbackDuration;
+
+            machine.CrossFade(currentAnimation, 0.08f);
+        }
+
+        private bool CanChainToNextCombo()
+        {
+            return comboIndex < GetComboCount() - 1;
+        }
+
+        private string GetComboAnimation(int index)
+        {
+            if (machine.lightComboAnimations != null
+                && index >= 0
+                && index < machine.lightComboAnimations.Length
+                && !string.IsNullOrEmpty(machine.lightComboAnimations[index]))
+            {
+                return machine.lightComboAnimations[index];
+            }
+
+            return machine.lightAttackAnimation;
+        }
+
+        private int GetComboCount()
+        {
+            return machine.lightComboAnimations != null && machine.lightComboAnimations.Length > 0
+                ? machine.lightComboAnimations.Length
+                : 1;
+        }
+
+        private static bool IsLightAttack(StateRequest request)
+        {
+            if (request.type != StateRequestType.Attack)
+                return false;
+
+            if (request.payload is AttackRequestPayload payload)
+                return payload.attackType == AttackType.Light && !payload.isAirAttack;
+
+            return true;
+        }
+
+        private float ResolveFallbackDuration(StateRequest request)
+        {
+            if (request.payload is AttackRequestPayload payload)
+            {
+                if (payload.isAirAttack)
+                    return machine.airAttackFallbackDuration;
+
+                if (payload.attackType == AttackType.Heavy)
+                    return machine.heavyAttackFallbackDuration;
+            }
+
+            return machine.lightComboFallbackDuration;
+        }
+
+        private static void RequestLocomotion(StateContext ctx)
+        {
+            ctx.SubmitRequest(StateRequest.Create(
+                StateRequestType.AnimationEnd,
+                CharacterStateType.Locomotion,
+                StatePriorities.Locomotion,
+                RequestSource.State,
+                force: true));
+        }
+
     }
 }
