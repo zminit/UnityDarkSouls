@@ -206,7 +206,6 @@ public class PlayerManager : MonoBehaviour
         if (!isSheathingWeapon)
             return;
 
-        isArmed = false;
         isSheathingWeapon = false;
         characterFSM?.RequestState(
             StateRequestType.AnimationEnd,
@@ -214,6 +213,14 @@ public class PlayerManager : MonoBehaviour
             StatePriorities.Locomotion,
             RequestSource.Animation,
             force: true);
+    }
+
+    public void MarkWeaponSheathedFromAnimationEvent()
+    {
+        if (!isSheathingWeapon)
+            return;
+
+        isArmed = false;
     }
 
     void UpdateUpperBodyLayerWeight()
@@ -408,7 +415,8 @@ public class PlayerManager : MonoBehaviour
         moveDir.Normalize();
         moveDir *= speed;
         moveDir = Vector3.ProjectOnPlane(moveDir, normal); // 确保移动方向在地面上
-        rb.velocity = moveDir; // 设置刚体速度以实现移动
+        Vector3 currentVelocity = rb.velocity;
+        rb.velocity = new Vector3(moveDir.x, currentVelocity.y, moveDir.z); // 只覆盖水平速度，保留垂直速度给重力和跳跃使用
     }
 
     public void LookRotate(Vector3 lookDir, Vector3 normal)
@@ -418,7 +426,9 @@ public class PlayerManager : MonoBehaviour
             lookDir.Normalize();
             lookDir = lookDir - (normal * (Vector3.Dot(normal, lookDir)));
             Quaternion targetRotation = Quaternion.LookRotation(lookDir, normal);
-            rb.rotation = Quaternion.Slerp(rb.rotation, targetRotation, Time.deltaTime * 5f); // 平滑旋转
+            float deltaTime = Time.inFixedTimeStep ? Time.fixedDeltaTime : Time.deltaTime;
+            Quaternion nextRotation = Quaternion.Slerp(rb.rotation, targetRotation, deltaTime * 5f);
+            rb.MoveRotation(nextRotation); // 通过 Rigidbody 旋转，避免绕过插值导致模型抖动
         }
     }
 }
