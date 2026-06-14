@@ -17,6 +17,12 @@ public class PlayerManager : MonoBehaviour
     public float SprintSpeed = 5.0f;
     public bool canRotate = true;
 
+    [Header("Movement Sync")]
+    [SerializeField]
+    bool forceRigidbodyInterpolation = true;
+    [SerializeField]
+    bool syncAnimatorWithPhysics = true;
+
     [SerializeField]
     Transform LeftFoot;
     [SerializeField]
@@ -89,6 +95,7 @@ public class PlayerManager : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         animator = GetComponentInChildren<Animator>();
         characterFSM = GetComponent<CFSM.CharacterFSM>();
+        ConfigureMovementSync();
         OnLandHandler = new OnLandHandler(LeftFoot, RightFoot);
         CacheUpperBodyLayer();
         CacheArmsLayer();
@@ -99,6 +106,15 @@ public class PlayerManager : MonoBehaviour
         ApplyUpperBodyLayerWeight();
         ApplyArmsLayerWeight();
         SyncGroundRayDebugSettings();
+    }
+
+    void ConfigureMovementSync()
+    {
+        if (rb != null && forceRigidbodyInterpolation)
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        if (animator != null && syncAnimatorWithPhysics)
+            animator.updateMode = AnimatorUpdateMode.AnimatePhysics;
     }
 
     private void Update()
