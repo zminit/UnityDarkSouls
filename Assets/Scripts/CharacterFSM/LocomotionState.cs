@@ -1,5 +1,3 @@
-#define CHARACTER_FSM_DEBUG
-
 using UnityEngine;
 
 namespace CFSM
@@ -9,12 +7,6 @@ namespace CFSM
     /// </summary>
     public class LocomotionState : CharacterStateBase
     {
-#if CHARACTER_FSM_DEBUG
-        private const float DebugWorldMoveDirArrowLength = 1.5f;
-        private const float DebugWorldMoveDirArrowHeadLength = 0.3f;
-        private const float DebugWorldMoveDirArrowHeadAngle = 25f;
-#endif
-
         /// <summary>状态机引用，用于读取 Inspector 中配置的动画名并播放动画。</summary>
         private readonly CharacterFSM machine;
 
@@ -143,10 +135,6 @@ namespace CFSM
             if (moveDir.sqrMagnitude <= 0.0001f)
                 return;
 
-#if CHARACTER_FSM_DEBUG
-            DrawWorldMoveDirection(ctx, moveDir);
-#endif
-
             if (!useStrafeMove && ctx.playerManager.canRotate)
                 ctx.playerManager.LookRotate(moveDir, Vector3.up);
 
@@ -239,30 +227,5 @@ namespace CFSM
 
             return moveDir;
         }
-
-#if CHARACTER_FSM_DEBUG
-        private static void DrawWorldMoveDirection(StateContext ctx, Vector3 worldMoveDir)
-        {
-            if (ctx.playerTransform == null || worldMoveDir.sqrMagnitude <= 0.0001f)
-                return;
-
-            Vector3 direction = worldMoveDir.normalized;
-            Vector3 origin = ctx.playerBody != null
-                ? ctx.playerBody.worldCenterOfMass
-                : ctx.playerTransform.position + Vector3.up;
-
-            Vector3 tip = origin + direction * DebugWorldMoveDirArrowLength;
-            Vector3 leftHead = Quaternion.AngleAxis(180f - DebugWorldMoveDirArrowHeadAngle, Vector3.up)
-                * direction
-                * DebugWorldMoveDirArrowHeadLength;
-            Vector3 rightHead = Quaternion.AngleAxis(180f + DebugWorldMoveDirArrowHeadAngle, Vector3.up)
-                * direction
-                * DebugWorldMoveDirArrowHeadLength;
-
-            Debug.DrawLine(origin, tip, Color.red, Time.fixedDeltaTime);
-            Debug.DrawLine(tip, tip + leftHead, Color.red, Time.fixedDeltaTime);
-            Debug.DrawLine(tip, tip + rightHead, Color.red, Time.fixedDeltaTime);
-        }
-#endif
     }
 }

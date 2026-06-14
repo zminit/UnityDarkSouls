@@ -15,12 +15,6 @@ namespace CFSM
         /// <summary>当前主状态名称，显示在 Inspector 中便于快速查看。</summary>
         [SerializeField] private string currentStateName;
 
-        /// <summary>临时诊断开关：开启后只把 Locomotion 的移动更新放到 Update 中执行，用于排查 FixedUpdate 物理步进导致的离散移动。</summary>
-        [SerializeField] private bool moveLocomotionInUpdateTest;
-
-        /// <summary>临时诊断开关：开启后 Locomotion 在 Update 中直接改 Transform 位置，完全绕开 Rigidbody 速度积分。</summary>
-        [SerializeField] private bool useTransformMoveForLocomotionTest;
-
         [Header("Input Buffer")]
         /// <summary>输入缓冲保留时间。短时间内无法执行的高优先级请求会在该时间内重试。</summary>
         [SerializeField] private float bufferDuration = 0.2f;
@@ -165,11 +159,6 @@ namespace CFSM
 
             currentState.Tick(ctx);
 
-            if (ShouldRunLocomotionTransformMoveInUpdate())
-                RunLocomotionTransformMoveTest();
-            else if (ShouldRunLocomotionFixedTickInUpdate())
-                currentState.FixedTick(ctx);
-
             ProcessPendingRequests();
             ProcessBufferedRequest();
 
@@ -181,110 +170,7 @@ namespace CFSM
         /// </summary>
         private void FixedUpdate()
         {
-            if (ShouldSkipLocomotionFixedTick())
-                return;
-
             currentState?.FixedTick(ctx);
-        }
-
-        private bool ShouldRunLocomotionFixedTickInUpdate()
-        {
-            return moveLocomotionInUpdateTest
-                && !useTransformMoveForLocomotionTest
-                && currentState != null
-                && currentStateType == CharacterStateType.Locomotion;
-        }
-
-        private bool ShouldSkipLocomotionFixedTick()
-        {
-            return (moveLocomotionInUpdateTest || useTransformMoveForLocomotionTest)
-                && currentStateType == CharacterStateType.Locomotion;
-        }
-
-        private bool ShouldRunLocomotionTransformMoveInUpdate()
-        {
-            return useTransformMoveForLocomotionTest
-                && currentStateType == CharacterStateType.Locomotion;
-        }
-
-        private void RunLocomotionTransformMoveTest()
-        {
-            if (ctx == null || ctx.playerTransform == null || ctx.playerManager == null)
-                return;
-
-            if (ctx.movementAmount <= 0.05f)
-            {
-                StopHorizontalVelocityForTransformMoveTest();
-                return;
-            }
-
-            Vector3 moveDir = GetCameraRelativeMoveDirectionForTransformMoveTest();
-            if (moveDir.sqrMagnitude <= 0.0001f)
-                return;
-
-            if (ctx.blackBoard == null
-                || !ctx.blackBoard.TryGetValue("UseStrafeMove", out bool useStrafeMove)
-                || !useStrafeMove)
-            {
-                if (ctx.playerManager.canRotate)
-                    LookRotateForTransformMoveTest(moveDir, Vector3.up);
-            }
-
-            float speed = GetMoveSpeedForTransformMoveTest();
-            ctx.playerTransform.position += moveDir.normalized * speed * Time.deltaTime;
-            StopHorizontalVelocityForTransformMoveTest();
-        }
-
-        private Vector3 GetCameraRelativeMoveDirectionForTransformMoveTest()
-        {
-            Vector3 forward = ctx.mainCamera != null ? ctx.mainCamera.transform.forward : ctx.playerTransform.forward;
-            Vector3 right = ctx.mainCamera != null ? ctx.mainCamera.transform.right : ctx.playerTransform.right;
-
-            forward.y = 0f;
-            right.y = 0f;
-            forward.Normalize();
-            right.Normalize();
-
-            Vector3 moveDir = forward * ctx.moveInput.y + right * ctx.moveInput.x;
-            return moveDir.sqrMagnitude > 1f ? moveDir.normalized : moveDir;
-        }
-
-        private float GetMoveSpeedForTransformMoveTest()
-        {
-            switch (ctx.moveMode)
-            {
-                case MoveMode.Sprint:
-                    return ctx.playerManager.SprintSpeed;
-                case MoveMode.Run:
-                    return ctx.playerManager.RunSpeed;
-                case MoveMode.Walk:
-                    return ctx.playerManager.WalkSpeed;
-                default:
-                    return 0f;
-            }
-        }
-
-        private void LookRotateForTransformMoveTest(Vector3 lookDir, Vector3 normal)
-        {
-            if (ctx.playerTransform == null || lookDir.sqrMagnitude <= 0.1f)
-                return;
-
-            lookDir.Normalize();
-            lookDir -= normal * Vector3.Dot(normal, lookDir);
-            Quaternion targetRotation = Quaternion.LookRotation(lookDir, normal);
-            ctx.playerTransform.rotation = Quaternion.Slerp(
-                ctx.playerTransform.rotation,
-                targetRotation,
-                Time.deltaTime * 5f);
-        }
-
-        private void StopHorizontalVelocityForTransformMoveTest()
-        {
-            if (ctx.playerBody == null)
-                return;
-
-            Vector3 velocity = ctx.playerBody.velocity;
-            ctx.playerBody.velocity = new Vector3(0f, velocity.y, 0f);
         }
 
         /// <summary>
